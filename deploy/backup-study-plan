@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+data_dir="/opt/study-plan/data"
+backup_dir="/opt/study-plan/backups"
+timestamp="$(date +%Y%m%d-%H%M%S)"
+
+mkdir -p "$backup_dir"
+sqlite3 "$data_dir/study.db" ".backup '$backup_dir/study-$timestamp.db'"
+tar -czf "$backup_dir/uploads-$timestamp.tar.gz" -C "$data_dir" uploads thumbs
+find "$backup_dir" -type f -mtime +14 -delete

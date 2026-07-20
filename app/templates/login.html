@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b101b">
+  <title>登录 | 长夏学程</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='10') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='19') }}">
+  <script src="{{ url_for('static', filename='vendor/lucide.min.js', v='4') }}" defer></script>
+  <script src="{{ url_for('static', filename='login.js', v='5') }}" defer></script>
+</head>
+<body class="login-page">
+  <header class="login-topbar">
+    <a class="login-wordmark" href="{{ url_for('login') }}" aria-label="长夏学程登录页">
+      <span class="brand-mark">CX</span>
+      <span><strong>长夏学程</strong><small>CHANGXIA LEARNING</small></span>
+    </a>
+    <span class="login-period"><i data-lucide="calendar-days"></i>2026.07.16–08.26</span>
+  </header>
+
+  <main class="login-layout">
+    <section class="login-context" aria-labelledby="planTitle">
+      <div class="login-scene" aria-hidden="true">
+        <span class="scene-window"></span>
+        <span class="scene-desk"></span>
+        <span class="scene-lamp"></span>
+        <span class="scene-book"></span>
+      </div>
+      <span class="login-kicker">2026 · 高二衔接暑期计划</span>
+      <h1 id="planTitle">长夏学程</h1>
+      <p>每天四科同步推进，专注完成任务并留下真实成果。</p>
+
+      <dl class="plan-facts glass-facts">
+        <div><dt>42</dt><dd>学习日</dd></div>
+        <div><dt>4</dt><dd>同步学科</dd></div>
+        <div><dt>840</dt><dd>分类任务</dd></div>
+      </dl>
+
+      <div class="login-subjects" aria-label="计划学科">
+        <span><i class="subject-swatch math"></i>数学</span>
+        <span><i class="subject-swatch physics"></i>物理</span>
+        <span><i class="subject-swatch chemistry"></i>化学</span>
+        <span><i class="subject-swatch english"></i>英语</span>
+      </div>
+    </section>
+
+    <section class="login-panel" aria-labelledby="loginTitle">
+      <div class="login-panel-heading">
+        <span class="section-kicker">WELCOME BACK</span>
+        <h2 id="loginTitle">登录长夏学程</h2>
+        <p>今日任务与成果记录</p>
+      </div>
+
+      <form class="login-form" method="post" autocomplete="on">
+        <label for="username">账号</label>
+        <div class="login-input-control">
+          <i data-lucide="user-round"></i>
+          <input id="username" name="username" autocomplete="username" placeholder="输入账号" required autofocus>
+        </div>
+
+        <label for="password">密码</label>
+        <div class="login-input-control">
+          <i data-lucide="lock-keyhole"></i>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="输入密码" required>
+          <button class="password-toggle" id="passwordToggle" type="button" title="显示密码" aria-label="显示密码">
+            <i data-lucide="eye"></i>
+          </button>
+        </div>
+
+        {% if error %}
+        <p class="form-error" role="alert"><i data-lucide="circle-alert"></i><span>{{ error }}</span></p>
+        {% endif %}
+
+        <button class="login-submit" type="submit">
+          <span>进入计划</span><i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+
+      <footer class="login-footer"><span>福建高二衔接</span><span>学生端 · 监督端</span></footer>
+    </section>
+  </main>
+</body>
+</html>

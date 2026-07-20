@@ -1,0 +1,18 @@
+[Unit]
+Description=Summer Study Plan Web Application
+After=network.target
+
+[Service]
+Type=simple
+User=studyplan
+Group=studyplan
+WorkingDirectory=/opt/study-plan/app
+EnvironmentFile=/etc/study-plan.env
+ExecStart=/opt/study-plan/venv/bin/gunicorn --workers 2 --threads 2 --bind 127.0.0.1:8000 --timeout 120 --access-logfile - --error-logfile - app:app
+Restart=always
+RestartSec=3
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

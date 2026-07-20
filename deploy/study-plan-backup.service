@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up Summer Study Plan data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/backup-study-plan

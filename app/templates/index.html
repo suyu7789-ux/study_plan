@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b101b">
+  <title>长夏学程</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='10') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='19') }}">
+  <script src="{{ url_for('static', filename='vendor/lucide.min.js', v='4') }}" defer></script>
+  <script>
+    window.APP_USER = {{ {"role": role, "displayName": display_name, "username": username, "canManageUsers": can_manage_users}|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='app.js', v='19') }}" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark">CX</span>
+        <div class="brand-copy">
+          <strong>长夏学程</strong>
+          <small>CHANGXIA LEARNING</small>
+        </div>
+      </div>
+      <nav class="sidebar-nav" aria-label="主导航">
+        <button class="nav-item is-active" data-view="tasks" type="button"><i data-lucide="clipboard-list"></i><span>我的课程</span></button>
+        <button class="nav-item" data-view="overview" type="button"><i data-lucide="chart-no-axes-combined"></i><span>项目进度</span></button>
+        <button class="nav-item" id="accountButton" type="button"><i data-lucide="user-round-cog"></i><span>账户设置</span></button>
+        {% if can_manage_users %}
+        <button class="nav-item" id="userManagementButton" type="button"><i data-lucide="users-round"></i><span>账号管理</span></button>
+        {% endif %}
+      </nav>
+      <div class="sidebar-user">
+        <span class="user-avatar">{{ display_name[:1] }}</span>
+        <span><strong>{{ display_name }}</strong><small>{{ '监督者' if role == 'supervisor' else '学生' }} · {{ username }}</small></span>
+      </div>
+      <div class="sidebar-footer">
+        <form method="post" action="{{ url_for('logout') }}">
+          <button class="logout-button" type="submit"><i data-lucide="log-out"></i><span>退出登录</span></button>
+        </form>
+      </div>
+    </aside>
+    <button class="sidebar-scrim" id="sidebarScrim" type="button" aria-label="关闭导航" tabindex="-1"></button>
+
+    <div class="app-workspace">
+      <header class="app-topbar">
+        <div class="topbar-title">
+          <button class="icon-button menu-button" id="menuButton" type="button" title="打开导航" aria-label="打开导航"><i data-lucide="menu"></i></button>
+          <div><span class="section-kicker" id="pageKicker">DAILY PLAN</span><h1 id="pageTitle">我的课程 | 任务列表</h1></div>
+        </div>
+        <div class="topbar-meta">
+          <span class="plan-period"><i data-lucide="calendar-days"></i>2026.07.16–08.26</span>
+          <span class="role-badge">{{ '监督者' if role == 'supervisor' else '学生' }}</span>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <section id="tasksView" class="view-panel is-active">
+          <div class="task-toolbar">
+            <div class="date-control">
+              <button class="icon-button bordered" id="previousDay" type="button" title="前一天" aria-label="前一天"><i data-lucide="chevron-left"></i></button>
+              <label class="date-field">
+                <span id="dayLabel">Day 1</span>
+                <input id="dateInput" type="date" aria-label="计划日期">
+              </label>
+              <button class="icon-button bordered" id="nextDay" type="button" title="后一天" aria-label="后一天"><i data-lucide="chevron-right"></i></button>
+            </div>
+            <div class="segmented-control" id="subjectFilter" aria-label="学科筛选">
+              <button class="is-active" data-subject="全部" type="button">全部</button>
+              <button data-subject="数学" type="button"><i class="subject-dot math"></i>数学</button>
+              <button data-subject="物理" type="button"><i class="subject-dot physics"></i>物理</button>
+              <button data-subject="化学" type="button"><i class="subject-dot chemistry"></i>化学</button>
+              <button data-subject="英语" type="button"><i class="subject-dot english"></i>英语</button>
+            </div>
+            <div class="toolbar-summary" id="dailySummary">0 / 20 项完成</div>
+          </div>
+
+          <div class="subject-progress" id="subjectProgress"></div>
+
+          <div class="task-list-shell">
+            <div class="task-list-header" aria-hidden="true">
+              <span>序号</span><span>学科 / 项目</span><span>任务描述</span><span>预计用时</span><span>照片凭证</span><span>状态</span><span>操作</span>
+            </div>
+            <div class="task-card-list" id="taskCardList"></div>
+            <div class="empty-state" id="emptyState" hidden><i data-lucide="list-checks"></i><span>当前筛选没有任务</span></div>
+          </div>
+        </section>
+
+        <section id="overviewView" class="view-panel">
+          <div class="overview-heading">
+            <div><span class="section-kicker">LEARNING OVERVIEW</span><h2>学习进度一目了然</h2><p>基于真实任务状态、成果图片和计划时长统计</p></div>
+            <span class="overview-date" id="overviewDate"></span>
+          </div>
+
+          <div class="metrics-band">
+            <div class="metric-item cyan"><span><i data-lucide="list-checks"></i>分类任务</span><strong id="metricTotal">840</strong><small>计划内全部任务</small></div>
+            <div class="metric-item mint"><span><i data-lucide="circle-check-big"></i>已完成</span><strong id="metricCompleted">0</strong><small>学生已标记完成</small></div>
+            <div class="metric-item yellow"><span><i data-lucide="gauge"></i>总完成率</span><strong id="metricRate">0%</strong><small>按分类任务计算</small></div>
+            <div class="metric-item pink"><span><i data-lucide="images"></i>成果图片</span><strong id="metricImages">0</strong><small>已上传凭证</small></div>
+            <div class="metric-item purple"><span><i data-lucide="clock-3"></i>计划时长</span><strong id="metricTime">175h</strong><small>全部建议时长</small></div>
+          </div>
+
+          <div class="overview-grid">
+            <section class="overview-section subject-panel">
+              <div class="section-heading"><div><span class="section-kicker">SUBJECTS</span><h3>学科进度</h3></div></div>
+              <div class="subject-overview" id="subjectOverview"></div>
+            </section>
+            <section class="overview-section week-panel">
+              <div class="section-heading"><div><span class="section-kicker">WEEKS</span><h3>每周完成率</h3></div></div>
+              <div class="week-chart" id="weekChart"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="移动端导航">
+    <button class="mobile-nav-button is-active" data-view="tasks" type="button"><i data-lucide="clipboard-list"></i><span>课程</span></button>
+    <button class="mobile-nav-button" data-view="overview" type="button"><i data-lucide="chart-no-axes-combined"></i><span>进度</span></button>
+    <button class="mobile-nav-button" data-open-account type="button"><i data-lucide="user-round-cog"></i><span>账户</span></button>
+    <button class="mobile-nav-button" data-open-menu type="button"><i data-lucide="menu"></i><span>菜单</span></button>
+  </nav>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+  <div class="modal-backdrop" id="imageModal" hidden>
+    <div class="image-modal" role="dialog" aria-modal="true" aria-label="查看成果图片">
+      <button class="icon-button modal-close" type="button" data-close-modal="imageModal" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      <img id="modalImage" alt="成果图片">
+      <div class="modal-caption" id="modalCaption"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="accountModal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <div class="dialog-header">
+        <div><span class="section-kicker">ACCOUNT</span><h2 id="accountTitle">{{ display_name }}</h2></div>
+        <button class="icon-button" type="button" data-close-modal="accountModal" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <form id="passwordForm" class="dialog-form">
+        <label>当前密码<input name="current_password" type="password" autocomplete="current-password" required></label>
+        <label>新密码<input name="new_password" type="password" autocomplete="new-password" minlength="10" required></label>
+        <label>确认新密码<input name="confirm_password" type="password" autocomplete="new-password" minlength="10" required></label>
+        <button class="primary-button" type="submit">修改密码</button>
+      </form>
+    </div>
+  </div>
+
+  {% if can_manage_users %}
+  <div class="modal-backdrop" id="userManagementModal" hidden>
+    <div class="user-management-dialog" role="dialog" aria-modal="true" aria-labelledby="userManagementTitle">
+      <div class="dialog-header">
+        <div><span class="section-kicker">ACCOUNTS</span><h2 id="userManagementTitle">账号管理</h2></div>
+        <button class="icon-button" type="button" data-close-modal="userManagementModal" title="关闭" aria-label="关闭账号管理"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="user-management-layout">
+        <form id="createUserForm" class="user-create-form">
+          <h3>创建账号</h3>
+          <label>账号<input name="username" autocomplete="off" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" required></label>
+          <label>显示名称<input name="display_name" autocomplete="off" maxlength="24" required></label>
+          <label>角色
+            <select name="role" required>
+              <option value="student">学生</option>
+              <option value="supervisor">监督者</option>
+            </select>
+          </label>
+          <label>初始密码<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
+          <button class="primary-button user-create-button" type="submit"><i data-lucide="user-plus"></i><span>创建账号</span></button>
+        </form>
+
+        <section class="user-list-section" aria-labelledby="existingUsersTitle">
+          <div class="user-list-heading"><h3 id="existingUsersTitle">现有账号</h3><span id="userCount"></span></div>
+          <div class="user-list" id="userList"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="modal-backdrop timer-backdrop" id="timerModal" hidden>
+    <div class="timer-dialog" role="dialog" aria-modal="true" aria-labelledby="timerTitle">
+      <div class="timer-heading">
+        <div>
+          <span class="section-kicker">FOCUS TIMER</span>
+          <h2 id="timerTitle">任务计时</h2>
+          <p id="timerTaskMeta"></p>
+        </div>
+        <button class="icon-button" type="button" data-close-modal="timerModal" title="关闭计时器" aria-label="关闭计时器"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="timer-dial" id="timerDial">
+        <div class="timer-dial-inner">
+          <div class="timer-clock" id="timerClock" aria-live="polite">20:00</div>
+          <span class="timer-status" id="timerStatus">准备开始</span>
+        </div>
+      </div>
+      <div class="timer-elapsed" id="timerElapsedLabel">已学习 0 分钟</div>
+      <div class="timer-progress" aria-hidden="true"><span id="timerProgressBar"></span></div>
+
+      <div class="timer-setup" id="timerSetup">
+        <label for="timerDuration">本次学习时间</label>
+        <div class="duration-control">
+          <input id="timerDuration" type="number" min="1" max="240" step="5" inputmode="numeric">
+          <span>分钟</span>
+        </div>
+        <p id="timerSuggestion">建议 20 分钟</p>
+      </div>
+
+      <div class="timer-actions">
+        <button class="timer-button primary" id="timerStart" type="button"><i data-lucide="play"></i><span>开始专注</span></button>
+        <button class="timer-button primary" id="timerResume" type="button" hidden><i data-lucide="play"></i><span>继续计时</span></button>
+        <button class="timer-button secondary" id="timerPause" type="button" hidden><i data-lucide="pause"></i><span>暂停</span></button>
+        <button class="timer-button secondary" id="timerFinish" type="button" hidden><i data-lucide="square"></i><span>结束本次</span></button>
+        <button class="timer-button ghost" id="timerReset" type="button" hidden><i data-lucide="rotate-ccw"></i><span>重新计时</span></button>
+      </div>
+      <p class="timer-note">计时结束后，任务仍需上传成果并手动标记为已完成。</p>
+    </div>
+  </div>
+</body>
+</html>
