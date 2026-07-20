@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星轨仪 · 专注倒计时 | CHANGXIA ASTROLABE</title>
+
+  <!-- 引入奢华现代英文字体与数字等宽字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      /* 深夜星空基底 */
+      --cosmic-dark: #05070f;
+      --cosmic-bg: radial-gradient(circle at 50% 50%, #0d1226 0%, #05070e 100%);
+
+      /* 霓虹多巴胺光晕 */
+      --neon-blue: #e0aaff;
+      --neon-mint: #c77dff;
+      --neon-pink: #9d4edd;
+      --neon-purple: #7b2cbf;
+      --neon-yellow: #3c096c;
+
+      /* 玻璃质感边框与底色 */
+      --glass-bg: rgba(13, 20, 38, 0.45);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-highlight: rgba(255, 255, 255, 0.03);
+      --shadow-premium: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--cosmic-dark);
+      background-image: var(--cosmic-bg);
+      color: #ffffff;
+      font-family: 'Outfit', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1000px;
+    }
+
+    /* 动态背景星尘特效 */
+    .starfield {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background-image:
+        radial-gradient(1px 1px at 20px 30px, #eee, transparent),
+        radial-gradient(1.5px 1.5px at 150px 80px, #fff, transparent),
+        radial-gradient(2px 2px at 300px 200px, rgba(0, 210, 255, 0.3), transparent),
+        radial-gradient(1.5px 1.5px at 500px 400px, #fff, transparent),
+        radial-gradient(1px 1px at 700px 100px, #ddd, transparent),
+        radial-gradient(2px 2px at 900px 600px, rgba(177, 159, 251, 0.3), transparent);
+      background-size: 1000px 1000px;
+      opacity: 0.55;
+      animation: drift 120s linear infinite;
+    }
+
+    @keyframes drift {
+      from { background-position: 0 0; }
+      to { background-position: 1000px 1000px; }
+    }
+
+    /* 主容器：科幻悬浮圆盘 */
+    .clock-shell {
+      position: relative;
+      z-index: 10;
+      width: min(540px, 94vw);
+      height: min(640px, 94vh);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 32px;
+      border: 1px solid var(--glass-border);
+      border-radius: 28px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      box-shadow: var(--shadow-premium);
+      transform-style: preserve-3d;
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .clock-shell:hover {
+      transform: translateY(-4px) rotateX(2deg);
+    }
+
+    /* 顶部副标志 */
+    .clock-brand {
+      text-align: center;
+      pointer-events: none;
+    }
+    .brand-kicker {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: var(--neon-blue);
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 1px;
+      margin-top: 4px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    /* 仪表盘时钟盘心 */
+    .astrolabe-face {
+      position: relative;
+      width: min(340px, 70vw);
+      height: min(340px, 70vw);
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: radial-gradient(circle, rgba(16, 26, 50, 0.5) 0%, rgba(5, 7, 15, 0.85) 100%);
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 210, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 背景星轨星相盘（缓缓旋转） */
+    .constellation-disc {
+      position: absolute;
+      inset: 15px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255, 255, 255, 0.04);
+      background-image:
+        radial-gradient(circle at 35% 45%, rgba(0, 210, 255, 0.12) 0%, transparent 60%),
+        radial-gradient(circle at 65% 55%, rgba(177, 159, 251, 0.12) 0%, transparent 60%);
+      opacity: 0.8;
+      animation: rotateDisc 180s linear infinite;
+    }
+
+    .constellation-disc::after {
+      content: "";
+      position: absolute;
+      inset: 30px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="20" cy="30" r="1" fill="white" opacity="0.3"/><circle cx="80" cy="20" r="1.5" fill="white" opacity="0.4"/><line x1="20" y1="30" x2="40" y2="70" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/><line x1="80" y1="20" x2="60" y2="50" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/></svg>');
+    }
+
+    @keyframes rotateDisc {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* 刻度盘设计 */
+    .clock-dial-marks {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .dial-mark {
+      position: absolute;
+      left: 50%;
+      top: 10px;
+      width: 2px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.15);
+      transform-origin: 50% 160px;
+    }
+
+    .dial-mark.major {
+      height: 14px;
+      width: 3px;
+      background: var(--neon-blue);
+      box-shadow: 0 0 8px var(--neon-blue);
+    }
+
+    .dial-number {
+      position: absolute;
+      left: 50%;
+      top: 24px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.4);
+      transform-origin: 50% 146px;
+    }
+
+    /* 进度条轨道设计（圆弧式） */
+    .orbital-progress {
+      position: absolute;
+      inset: 35px;
+      transform: rotate(-90deg);
+      pointer-events: none;
+    }
+
+    .orbit-ring {
+      fill: none;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* 时间指针设计 */
+    .hand-container {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 时针 */
+    .hour-hand-wrap {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      transform-origin: center center;
+    }
+
+    .hour-hand {
+      position: absolute;
+      left: calc(50% - 4px);
+      bottom: 50%;
+      width: 8px;
+      height: 70px;
+      border-radius: 6px;
+      background: linear-gradient(to top, rgba(0, 210, 255, 0.2), var(--neon-blue));
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+      transform-origin: bottom center;
+    }
+
+    .hour-hand::after {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 2px;
+      width: 4px;
+      height: 15px;
+      border-radius: 2px;
+      background: #ffffff;
+      opacity: 0.7;
+    }
+
+    /* 分针 */
+    .minute-hand-wrap {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      transform-origin: center center;
+    }
+
+    .minute-hand {
+      position: absolute;
+      left: calc(50% - 2.5px);
+      bottom: 50%;
+      width: 5px;
+      height: 105px;
+      border-radius: 4px;
+      background: linear-gradient(to top, rgba(45, 212, 191, 0.2), var(--neon-mint));
+      box-shadow: 0 0 15px rgba(45, 212, 191, 0.4);
+      transform-origin: bottom center;
+    }
+
+    /* 秒针 (带弹性缓冲) */
+    .second-hand-wrap {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      transform-origin: center center;
+    }
+
+    .second-hand {
+      position: absolute;
+      left: calc(50% - 1px);
+      bottom: 50%;
+      width: 2px;
+      height: 125px;
+      background: var(--neon-pink);
+      box-shadow: 0 0 18px var(--neon-pink);
+      transform-origin: bottom center;
+    }
+
+    .second-hand::before {
+      content: "";
+      position: absolute;
+      top: -12px;
+      left: -5px;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--neon-pink);
+      border-radius: 50%;
+      background: var(--cosmic-dark);
+      box-shadow: 0 0 8px var(--neon-pink);
+    }
+
+    /* 中心轴 */
+    .center-cap {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: #ffffff;
+      border-radius: 50%;
+      border: 4px solid var(--cosmic-dark);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+      z-index: 20;
+    }
+
+    /* 底部数字显示区 */
+    .digital-board {
+      text-align: center;
+      margin-top: 14px;
+    }
+
+    .digital-time {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 38px;
+      letter-spacing: 1px;
+      color: #ffffff;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.15), 0 0 2px rgba(255, 255, 255, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .digital-time span.sec {
+      font-size: 20px;
+      color: var(--neon-pink);
+      align-self: flex-end;
+      margin-bottom: 5px;
+      margin-left: 4px;
+      text-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
+    }
+
+    .digital-date {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 2px;
+      margin-top: 6px;
+      text-transform: uppercase;
+    }
+
+    /* 操作控制面板 */
+    .control-panel {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--glass-border);
+    }
+
+    .action-btn {
+      flex: 1;
+      height: 40px;
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .action-btn.is-active {
+      background: color-mix(in srgb, var(--neon-blue) 12%, transparent);
+      border-color: var(--neon-blue);
+      color: var(--neon-blue);
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
+    }
+
+    /* 炫彩主题气泡背景（软发光） */
+    .glow-blob {
+      position: absolute;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: 2;
+      opacity: 0.25;
+      pointer-events: none;
+      animation: breatheBlob 16s ease-in-out infinite alternate;
+    }
+
+    .blob-blue {
+      background: var(--neon-blue);
+      left: -80px;
+      top: -80px;
+    }
+
+    .blob-purple {
+      background: var(--neon-purple);
+      right: -80px;
+      bottom: -80px;
+      animation-delay: -8s;
+    }
+
+    @keyframes breatheBlob {
+      0% { transform: scale(1) translate(0, 0); }
+      100% { transform: scale(1.25) translate(40px, 30px); }
+    }
+
+    /* 声效与控制提示标签 */
+    .audio-notice {
+      position: absolute;
+      bottom: -32px;
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.25);
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 动态宇宙发光粒子背景 -->
+  <div class="starfield"></div>
+  <div class="glow-blob blob-blue"></div>
+  <div class="glow-blob blob-purple"></div>
+
+  <!-- 核心时钟卡片 -->
+  <main class="clock-shell" id="clockShell">
+
+    <!-- 头部标志 -->
+    <header class="clock-brand">
+      <span class="brand-kicker">CHANGXIA LEARNING</span>
+      <h1 class="brand-title">星轨仪倒计时舱</h1>
+    </header>
+
+    <!-- 罗盘表盘 -->
+    <div class="astrolabe-face">
+
+      <!-- 星盘星位图 -->
+      <div class="constellation-disc"></div>
+
+      <!-- 圆弧刻度与轨道 -->
+      <svg class="orbital-progress" width="270" height="270" viewBox="0 0 270 270">
+        <!-- 秒轨 -->
+        <circle class="orbit-ring" cx="135" cy="135" r="120" stroke="rgba(244, 63, 94, 0.08)" stroke-width="2" />
+        <circle class="orbit-ring" id="secOrbit" cx="135" cy="135" r="120" stroke="var(--neon-pink)" stroke-width="2.5"
+                stroke-dasharray="753.98" stroke-dashoffset="753.98" filter="drop-shadow(0 0 4px #f43f5e)" />
+
+        <!-- 分轨 -->
+        <circle class="orbit-ring" cx="135" cy="135" r="100" stroke="rgba(45, 212, 191, 0.06)" stroke-width="3" />
+        <circle class="orbit-ring" id="minOrbit" cx="135" cy="135" r="100" stroke="var(--neon-mint)" stroke-width="4.5"
+                stroke-dasharray="628.318" stroke-dashoffset="628.318" filter="drop-shadow(0 0 4px #2dd4bf)" />
+
+        <!-- 时轨 -->
+        <circle class="orbit-ring" cx="135" cy="135" r="80" stroke="rgba(0, 210, 255, 0.06)" stroke-width="4" />
+        <circle class="orbit-ring" id="hourOrbit" cx="135" cy="135" r="80" stroke="var(--neon-blue)" stroke-width="6"
+                stroke-dasharray="502.65" stroke-dashoffset="502.65" filter="drop-shadow(0 0 4px #00d2ff)" />
+      </svg>
+
+      <!-- 刻度点 -->
+      <div class="clock-dial-marks" id="dialMarks"></div>
+
+      <!-- 指针组 -->
+      <div class="hand-container">
+        <!-- 时针 -->
+        <div class="hour-hand-wrap" id="hourHand"><div class="hour-hand"></div></div>
+        <!-- 分针 -->
+        <div class="minute-hand-wrap" id="minHand"><div class="minute-hand"></div></div>
+        <!-- 秒针 -->
+        <div class="second-hand-wrap" id="secHand"><div class="second-hand"></div></div>
+        <!-- 指针盖 -->
+        <div class="center-cap"></div>
+      </div>
+
+    </div>
+
+    <!-- 底部数据状态面板 -->
+    <div class="digital-board">
+      <div class="digital-time">
+        <span id="txtHour">00</span>:<span id="txtMin">20</span><span class="sec" id="txtSec">00</span>
+      </div>
+      <div class="digital-date" id="txtDate">20 分钟专注倒计时</div>
+    </div>
+
+    <!-- 交互控制键 -->
+    <footer class="control-panel">
+
+      <!-- 滴答声开关 -->
+      <button class="action-btn" id="btnSound" type="button" title="开关机械滴答声">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
+        <span>滴答声</span>
+      </button>
+
+      <!-- 太空氛围音开关 -->
+      <button class="action-btn" id="btnAmbient" type="button" title="开关环境脉冲背景音">
+        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        <span>星空混响</span>
+      </button>
+
+      <!-- 炫光主题切换 -->
+      <button class="action-btn" id="btnTheme" type="button" title="切换光晕色系">
+        <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+        <span>变换星云</span>
+      </button>
+
+    </footer>
+
+    <!-- 底栏说明文字 -->
+    <span class="audio-notice">本星盘支持 Web Audio 合成器音效，请放心点击交互</span>
+
+  </main>
+
+  <script>
+    // 1. 初始化表盘刻度点与数字
+    function initDial() {
+      const marksContainer = document.getElementById('dialMarks');
+
+      // 循环生成 12 小时刻度与数字
+      for (let i = 0; i < 12; i++) {
+        const angle = i * 30;
+
+        // 刻度线
+        const mark = document.createElement('div');
+        mark.className = `dial-mark ${i % 3 === 0 ? 'major' : ''}`;
+        mark.style.transform = `rotate(${angle}deg)`;
+        marksContainer.appendChild(mark);
+
+        // 数字
+        const num = document.createElement('div');
+        num.className = 'dial-number';
+        num.textContent = i === 0 ? 12 : i;
+        num.style.transform = `rotate(${angle}deg)`;
+
+        // 抵消数字本身的旋转，保持文字直立
+        const innerText = document.createElement('span');
+        innerText.style.display = 'inline-block';
+        innerText.style.transform = `rotate(${-angle}deg)`;
+        innerText.textContent = num.textContent;
+        num.textContent = '';
+        num.appendChild(innerText);
+
+        marksContainer.appendChild(num);
+      }
+    }
+
+    initDial();
+
+    // 2. 倒计时更新逻辑 (保留平滑旋转与三层轨道渲染)
+    let lastSecond = -1;
+    const countdownDurationSeconds = 20 * 60;
+    const countdownStartedAt = performance.now();
+
+    function updateClock() {
+      const elapsed = (performance.now() - countdownStartedAt) / 1000;
+      const remaining = Math.max(0, countdownDurationSeconds - elapsed);
+      const totalSeconds = Math.ceil(remaining);
+      const sec = totalSeconds % 60;
+      const min = Math.floor((totalSeconds % 3600) / 60);
+      const hour = Math.floor(totalSeconds / 3600);
+      const smoothSecond = remaining % 60;
+      const secAngle = smoothSecond * 6;
+      const minAngle = ((remaining % 3600) / 3600) * 360;
+      const hourAngle = ((remaining % 43200) / 43200) * 360;
+
+      // 旋转指针
+      document.getElementById('secHand').style.transform = `rotate(${secAngle}deg)`;
+      document.getElementById('minHand').style.transform = `rotate(${minAngle}deg)`;
+      document.getElementById('hourHand').style.transform = `rotate(${hourAngle}deg)`;
+
+      // 计算并更新圆轨进度
+      const secCircumference = 753.98;
+      const remainingMinute = remaining > 0 ? (totalSeconds % 60 || 60) : 0;
+      const secOffset = secCircumference * (1 - remainingMinute / 60);
+      document.getElementById('secOrbit').style.strokeDashoffset = secOffset;
+
+      const minCircumference = 628.318;
+      const remainingHour = remaining > 0 ? (totalSeconds % 3600 || 3600) : 0;
+      const minOffset = minCircumference * (1 - remainingHour / 3600);
+      document.getElementById('minOrbit').style.strokeDashoffset = minOffset;
+
+      const hourCircumference = 502.65;
+      const hourOffset = hourCircumference * (1 - remaining / countdownDurationSeconds);
+      document.getElementById('hourOrbit').style.strokeDashoffset = hourOffset;
+
+      // 更新下方数字面板
+      document.getElementById('txtHour').textContent = String(hour).padStart(2, '0');
+      document.getElementById('txtMin').textContent = String(min).padStart(2, '0');
+      document.getElementById('txtSec').textContent = String(sec).padStart(2, '0');
+
+      document.getElementById('txtDate').textContent = remaining > 0 ? '20 分钟专注倒计时' : '本次倒计时已结束';
+
+      // 触发滴答声音效
+      if (soundEnabled && totalSeconds !== lastSynthSec) {
+        lastSynthSec = totalSeconds;
+        playTick(totalSeconds % 60 === 0);
+      }
+    }
+
+    let lastSynthSec = -1;
+    setInterval(updateClock, 30); // 30ms 刷新率实现极致平滑度
+
+    // 3. Web Audio API 音效合成器 (免文件引入)
+    let audioCtx = null;
+    let soundEnabled = false;
+    let ambientEnabled = false;
+    let ambientOsc = null;
+    let ambientGain = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // 合成滴答声 (秒针跳动)
+    function playTick(isMajor = false) {
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      // 主刻度(整分)声音高，次刻度声音清脆
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(isMajor ? 880 : 1200, audioCtx.currentTime);
+
+      // 极短衰减，模拟木质或精密齿轮敲击
+      gain.gain.setValueAtTime(isMajor ? 0.08 : 0.04, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.04);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    // 合成漫步太空的环境背景混响 (Cosmic Drone Pad)
+    function startAmbient() {
+      initAudio();
+      if (ambientOsc) return;
+
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      // 低音柔和双振荡器微失谐，营造宏大空间混响
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(55, audioCtx.currentTime); // A1 低音
+      osc1.detune.setValueAtTime(-10, audioCtx.currentTime);
+
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(110, audioCtx.currentTime); // A2 八度
+      osc2.detune.setValueAtTime(10, audioCtx.currentTime);
+
+      // 低通滤波器限制锯齿波高频，使音色厚重温暖
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(280, audioCtx.currentTime);
+      filter.Q.setValueAtTime(4, audioCtx.currentTime);
+
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      // 渐入，音量设定非常轻，作为背景环境音
+      gain.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 3.0);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc1.start();
+      osc2.start();
+
+      ambientOsc = [osc1, osc2];
+      ambientGain = gain;
+    }
+
+    function stopAmbient() {
+      if (!ambientGain) return;
+      const currentGain = ambientGain;
+      const currentOsc = ambientOsc;
+
+      // 渐出后停止，防止爆音
+      currentGain.gain.cancelScheduledValues(audioCtx.currentTime);
+      currentGain.gain.setValueAtTime(currentGain.gain.value, audioCtx.currentTime);
+      currentGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.0);
+
+      setTimeout(() => {
+        currentOsc.forEach(osc => {
+          try { osc.stop(); } catch(_e) {}
+        });
+      }, 1200);
+
+      ambientOsc = null;
+      ambientGain = null;
+    }
+
+    // 4. 按钮交互处理
+
+    // 滴答声控制
+    document.getElementById('btnSound').addEventListener('click', function() {
+      initAudio();
+      soundEnabled = !soundEnabled;
+      this.classList.toggle('is-active', soundEnabled);
+    });
+
+    // 星空混响控制
+    document.getElementById('btnAmbient').addEventListener('click', function() {
+      initAudio();
+      ambientEnabled = !ambientEnabled;
+      this.classList.toggle('is-active', ambientEnabled);
+      if (ambientEnabled) {
+        startAmbient();
+      } else {
+        stopAmbient();
+      }
+    });
+
+    // 太空星云主题变换 (在多套发光配色方案中循环)
+    const themes = [
+      {
+        dark: '#0a050f',
+        bg: 'radial-gradient(circle at 50% 50%, #200d2b 0%, #08030b 100%)',
+        blue: '#e0aaff', mint: '#c77dff', pink: '#9d4edd', purple: '#7b2cbf', yellow: '#3c096c',
+        blobLeft: '#9d4edd', blobRight: '#3c096c'
+      },
+      {
+        dark: '#05070f',
+        bg: 'radial-gradient(circle at 50% 50%, #0d1226 0%, #05070e 100%)',
+        blue: '#00d2ff', mint: '#2dd4bf', pink: '#f43f5e', purple: '#b19ffb', yellow: '#fbbf24',
+        blobLeft: '#00d2ff', blobRight: '#b19ffb'
+      },
+      {
+        dark: '#050c0c',
+        bg: 'radial-gradient(circle at 50% 50%, #072522 0%, #020808 100%)',
+        blue: '#06b6d4', mint: '#10b981', pink: '#f43f5e', purple: '#8b5cf6', yellow: '#f59e0b',
+        blobLeft: '#10b981', blobRight: '#06b6d4'
+      }
+    ];
+
+    let currentThemeIdx = 0;
+
+    document.getElementById('btnTheme').addEventListener('click', function() {
+      currentThemeIdx = (currentThemeIdx + 1) % themes.length;
+      const th = themes[currentThemeIdx];
+
+      // 更新 CSS 变量值，让全局样式自动重绘
+      document.documentElement.style.setProperty('--cosmic-dark', th.dark);
+      document.documentElement.style.setProperty('--cosmic-bg', th.bg);
+      document.documentElement.style.setProperty('--neon-blue', th.blue);
+      document.documentElement.style.setProperty('--neon-mint', th.mint);
+      document.documentElement.style.setProperty('--neon-pink', th.pink);
+      document.documentElement.style.setProperty('--neon-purple', th.purple);
+      document.documentElement.style.setProperty('--neon-yellow', th.yellow);
+
+      // 更新大发光体渐变颜色
+      document.querySelector('.blob-blue').style.background = th.blobLeft;
+      document.querySelector('.blob-purple').style.background = th.blobRight;
+
+      // 播放一次提示音效
+      if (audioCtx) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600 + currentThemeIdx * 100, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+      }
+    });
+
+    // 5. 时钟盘陀螺仪 3D 悬浮鼠标追踪
+    const shell = document.getElementById('clockShell');
+
+    document.addEventListener('mousemove', function(e) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const dx = (e.clientX - cx) / cx; // -1 ~ 1
+      const dy = (e.clientY - cy) / cy; // -1 ~ 1
+
+      // 限制倾斜角度，生成微小科幻位移
+      shell.style.transform = `rotateY(${dx * 16}deg) rotateX(${-dy * 16}deg) translateY(-2px)`;
+    });
+
+    document.addEventListener('mouseleave', function() {
+      shell.style.transform = 'rotateY(0deg) rotateX(0deg) translateY(0deg)';
+    });
+  </script>
+</body>
+</html>

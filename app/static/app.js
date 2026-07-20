@@ -197,8 +197,8 @@ function setupTimerClockExperience() {
     else stopTimerAmbient();
   });
   const themes = [
+    { blue: "#e0aaff", mint: "#c77dff", pink: "#9d4edd", purple: "#7b2cbf", yellow: "#3c096c" },
     { blue: "#00d2ff", mint: "#2dd4bf", pink: "#f43f5e", purple: "#b19ffb", yellow: "#fbbf24" },
-    { blue: "#e0aaff", mint: "#c77dff", pink: "#9d4edd", purple: "#7b2cbf", yellow: "#fbbf24" },
     { blue: "#06b6d4", mint: "#10b981", pink: "#f43f5e", purple: "#8b5cf6", yellow: "#f59e0b" },
   ];
   let themeIndex = 0;
