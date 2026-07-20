@@ -97,6 +97,127 @@ function timerRemaining(task) {
   return Math.max(0, Number(task.timer?.target_seconds || 0) - timerElapsed(task));
 }
 
+function initTimerDialMarks() {
+  const container = document.getElementById("timerDialMarks");
+  if (!container || container.childElementCount) return;
+  for (let index = 0; index < 12; index += 1) {
+    const angle = index * 30;
+    const mark = document.createElement("span");
+    mark.className = `dial-mark ${index % 3 === 0 ? "major" : ""}`;
+    mark.style.transform = `rotate(${angle}deg)`;
+    container.appendChild(mark);
+
+    const number = document.createElement("span");
+    number.className = "dial-number";
+    number.style.transform = `rotate(${angle}deg)`;
+    const label = document.createElement("span");
+    label.textContent = index === 0 ? "12" : String(index);
+    label.style.transform = `rotate(${-angle}deg)`;
+    number.appendChild(label);
+    container.appendChild(number);
+  }
+}
+
+const timerAudio = { context: null, soundEnabled: false, ambientEnabled: false, oscillators: null, gain: null, lastTickSecond: null };
+
+function initTimerAudio() {
+  if (!timerAudio.context) timerAudio.context = new (window.AudioContext || window.webkitAudioContext)();
+  if (timerAudio.context.state === "suspended") timerAudio.context.resume();
+}
+
+function playTimerTick(isMajor = false) {
+  if (!timerAudio.context) return;
+  const oscillator = timerAudio.context.createOscillator();
+  const gain = timerAudio.context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(isMajor ? 880 : 1200, timerAudio.context.currentTime);
+  gain.gain.setValueAtTime(isMajor ? 0.08 : 0.04, timerAudio.context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, timerAudio.context.currentTime + 0.04);
+  oscillator.connect(gain).connect(timerAudio.context.destination);
+  oscillator.start();
+  oscillator.stop(timerAudio.context.currentTime + 0.05);
+}
+
+function startTimerAmbient() {
+  initTimerAudio();
+  if (timerAudio.oscillators) return;
+  const first = timerAudio.context.createOscillator();
+  const second = timerAudio.context.createOscillator();
+  const gain = timerAudio.context.createGain();
+  const filter = timerAudio.context.createBiquadFilter();
+  first.type = "sawtooth";
+  first.frequency.setValueAtTime(55, timerAudio.context.currentTime);
+  first.detune.setValueAtTime(-10, timerAudio.context.currentTime);
+  second.type = "triangle";
+  second.frequency.setValueAtTime(110, timerAudio.context.currentTime);
+  second.detune.setValueAtTime(10, timerAudio.context.currentTime);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(280, timerAudio.context.currentTime);
+  filter.Q.setValueAtTime(4, timerAudio.context.currentTime);
+  gain.gain.setValueAtTime(0, timerAudio.context.currentTime);
+  gain.gain.linearRampToValueAtTime(0.12, timerAudio.context.currentTime + 3);
+  first.connect(filter);
+  second.connect(filter);
+  filter.connect(gain).connect(timerAudio.context.destination);
+  first.start();
+  second.start();
+  timerAudio.oscillators = [first, second];
+  timerAudio.gain = gain;
+}
+
+function stopTimerAmbient() {
+  if (!timerAudio.gain) return;
+  const gain = timerAudio.gain;
+  const oscillators = timerAudio.oscillators;
+  gain.gain.cancelScheduledValues(timerAudio.context.currentTime);
+  gain.gain.setValueAtTime(gain.gain.value, timerAudio.context.currentTime);
+  gain.gain.linearRampToValueAtTime(0, timerAudio.context.currentTime + 1);
+  setTimeout(() => oscillators.forEach((oscillator) => { try { oscillator.stop(); } catch (_error) {} }), 1200);
+  timerAudio.oscillators = null;
+  timerAudio.gain = null;
+}
+
+function setupTimerClockExperience() {
+  const shell = document.getElementById("timerClockShell");
+  const soundButton = document.getElementById("btnSound");
+  const ambientButton = document.getElementById("btnAmbient");
+  const themeButton = document.getElementById("btnTheme");
+  if (!shell || !soundButton || !ambientButton || !themeButton) return;
+  soundButton.addEventListener("click", () => {
+    initTimerAudio();
+    timerAudio.soundEnabled = !timerAudio.soundEnabled;
+    soundButton.classList.toggle("is-active", timerAudio.soundEnabled);
+    if (timerAudio.soundEnabled) playTimerTick(false);
+  });
+  ambientButton.addEventListener("click", () => {
+    initTimerAudio();
+    timerAudio.ambientEnabled = !timerAudio.ambientEnabled;
+    ambientButton.classList.toggle("is-active", timerAudio.ambientEnabled);
+    if (timerAudio.ambientEnabled) startTimerAmbient();
+    else stopTimerAmbient();
+  });
+  const themes = [
+    { blue: "#00d2ff", mint: "#2dd4bf", pink: "#f43f5e", purple: "#b19ffb", yellow: "#fbbf24" },
+    { blue: "#e0aaff", mint: "#c77dff", pink: "#9d4edd", purple: "#7b2cbf", yellow: "#fbbf24" },
+    { blue: "#06b6d4", mint: "#10b981", pink: "#f43f5e", purple: "#8b5cf6", yellow: "#f59e0b" },
+  ];
+  let themeIndex = 0;
+  themeButton.addEventListener("click", () => {
+    themeIndex = (themeIndex + 1) % themes.length;
+    const theme = themes[themeIndex];
+    Object.entries(theme).forEach(([name, value]) => shell.style.setProperty(`--neon-${name}`, value));
+    themeButton.classList.add("is-active");
+    setTimeout(() => themeButton.classList.remove("is-active"), 700);
+    if (timerAudio.context) playTimerTick(true);
+  });
+  shell.addEventListener("mousemove", (event) => {
+    const dx = (event.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+    const dy = (event.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+    shell.style.transform = `rotateY(${dx * 8}deg) rotateX(${-dy * 8}deg) translateY(-2px)`;
+  });
+  shell.addEventListener("mouseleave", () => { shell.style.transform = "rotateY(0deg) rotateX(0deg) translateY(0)"; });
+}
+
 function formatClock(totalSeconds) {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
   const hours = Math.floor(safeSeconds / 3600);
@@ -466,10 +587,31 @@ function renderTimerClock() {
   const progress = target ? Math.min(100, (elapsed / target) * 100) : 0;
   document.getElementById("timerClock").textContent = formatClock(remaining);
   document.getElementById("timerProgressBar").style.width = `${progress}%`;
-  document.getElementById("timerDial").style.setProperty("--timer-progress", `${progress * 3.6}deg`);
+  const remainingMinute = remaining > 0 ? (remaining % 60 || 60) : 0;
+  const remainingHour = remaining > 0 ? (remaining % 3600 || 3600) : 0;
+  const secOrbit = document.getElementById("timerSecOrbit");
+  const minOrbit = document.getElementById("timerMinOrbit");
+  const hourOrbit = document.getElementById("timerOrbitProgress");
+  if (secOrbit) secOrbit.style.strokeDashoffset = String(753.98 * (1 - remainingMinute / 60));
+  if (minOrbit) minOrbit.style.strokeDashoffset = String(628.318 * (1 - remainingHour / 3600));
+  if (hourOrbit) hourOrbit.style.strokeDashoffset = String(502.65 * (progress / 100));
+  const hourHand = document.getElementById("timerHourHand");
+  const minHand = document.getElementById("timerMinHand");
+  const secHand = document.getElementById("timerSecHand");
+  if (hourHand) hourHand.style.transform = `rotate(${((remaining % 43200) / 43200) * 360}deg)`;
+  if (minHand) minHand.style.transform = `rotate(${((remaining % 3600) / 3600) * 360}deg)`;
+  if (secHand) secHand.style.transform = `rotate(${(remainingMinute / 60) * 360}deg)`;
   document.getElementById("timerStatus").textContent = timerStateText(task.timer.state, remaining);
   document.getElementById("timerStatus").dataset.state = task.timer.state;
+  document.getElementById("timerDate").textContent = task.timer.state === "completed" ? "本次倒计时已结束" : "剩余时间倒计时";
   document.getElementById("timerElapsedLabel").textContent = `已学习 ${Math.floor(elapsed / 60)} 分钟`;
+
+  if (timerAudio.soundEnabled && task.timer.state === "running" && remaining !== timerAudio.lastTickSecond) {
+    timerAudio.lastTickSecond = remaining;
+    playTimerTick(remaining % 60 === 0);
+  } else if (task.timer.state !== "running") {
+    timerAudio.lastTickSecond = null;
+  }
 
   const rowLabel = document.querySelector(`[data-timer-task="${task.id}"] .timer-button-label`);
   if (rowLabel && task.timer.state === "running") rowLabel.textContent = formatClock(remaining);
@@ -545,6 +687,7 @@ async function restoreActiveTimer() {
 }
 
 setInterval(renderTimerClock, 500);
+initTimerDialMarks();
 
 document.addEventListener("change", (event) => {
   const target = event.target;
@@ -766,4 +909,5 @@ async function start() {
   }
 }
 
+setupTimerClockExperience();
 start();

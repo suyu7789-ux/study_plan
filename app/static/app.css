@@ -676,6 +676,33 @@ svg { flex: 0 0 auto; }
 .timer-button.ghost { border: 1px solid var(--line); background: transparent; color: var(--muted); }
 .timer-note { margin: 13px 0 0; color: var(--dim); text-align: center; font-size: 9px; }
 
+/* 星轨倒计时盘：沿用 clock.html 的轨道与刻度语言，数据由持久化任务计时器驱动。 */
+.timer-astrolabe {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.1);
+  background: radial-gradient(circle at 50% 45%, rgba(16, 34, 64, .76), rgba(5, 9, 20, .98) 72%);
+  box-shadow: inset 0 0 40px rgba(0,0,0,.8), 0 0 34px rgba(0,210,255,.12);
+}
+.timer-astrolabe::before { width: 244px; height: 244px; background: rgba(7, 15, 30, .78); }
+.timer-constellation { position: absolute; inset: 22px; border: 1px dashed rgba(255,255,255,.08); border-radius: 50%; opacity: .8; background: linear-gradient(135deg, rgba(0,210,255,.09), transparent 46%, rgba(177,159,251,.1)); animation: timerOrbitDrift 32s linear infinite; }
+.timer-constellation::after { content: ""; position: absolute; inset: 28px; border: 1px solid rgba(255,255,255,.045); border-radius: 50%; background: linear-gradient(30deg, transparent 47%, rgba(255,255,255,.09) 48% 49%, transparent 50%), linear-gradient(142deg, transparent 47%, rgba(255,255,255,.06) 48% 49%, transparent 50%); }
+.timer-orbital-progress { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events: none; }
+.timer-orbit-track, .timer-orbit-progress { fill: none; stroke-linecap: round; }
+.timer-orbit-track { stroke: rgba(255,255,255,.08); stroke-width: 5; }
+.timer-orbit-progress { stroke: var(--physics); stroke-width: 6; stroke-dasharray: 647.168; stroke-dashoffset: 0; filter: drop-shadow(0 0 5px var(--physics)); transition: stroke-dashoffset 400ms linear, stroke 180ms ease; }
+.timer-dial-marks { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.timer-dial-mark { position: absolute; left: 50%; top: 10px; width: 2px; height: 8px; background: rgba(255,255,255,.2); transform-origin: 50% 130px; }
+.timer-dial-mark.is-major { width: 3px; height: 14px; background: var(--math); box-shadow: 0 0 8px var(--math); }
+.timer-dial-number { position: absolute; left: 50%; top: 24px; color: rgba(255,255,255,.42); font-family: var(--numeric); font-size: 10px; font-weight: 800; transform-origin: 50% 116px; }
+.timer-dial-number span { display: inline-block; }
+.timer-astrolabe .timer-dial-inner { position: relative; z-index: 3; }
+.timer-astrolabe .timer-clock { font-family: "Share Tech Mono", var(--numeric); font-size: 52px; letter-spacing: .04em; text-shadow: 0 0 18px rgba(255,255,255,.18); }
+.timer-astrolabe .timer-status { box-shadow: 0 0 14px rgba(0,210,255,.12); }
+@keyframes timerOrbitDrift { to { transform: rotate(360deg); } }
+
 .mobile-nav { display: none; }
 
 .login-page {
@@ -1188,6 +1215,128 @@ svg { flex: 0 0 auto; }
   .task-timer-button { padding-inline: 7px; }
   .gauge-ring { width: 94px; height: 94px; }
   .gauge-ring::before { width: 74px; height: 74px; }
+}
+
+/* 登录页最终布局：整幅书房背景上仅保留登录卡片。 */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #050a14 url("/static/images/login-midnight-study.webp?v=25") center / cover fixed no-repeat;
+  animation: none;
+}
+.login-page::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: linear-gradient(110deg, rgba(3,9,19,.72), rgba(4,10,21,.27) 52%, rgba(3,7,15,.64)); }
+.login-layout { position: relative; z-index: 1; width: min(460px, 100%); min-height: 0; margin: auto; display: block; }
+.login-panel { padding: 42px 44px 28px; border: 1px solid rgba(220,232,249,.22); border-radius: 12px; background: rgba(10, 20, 38, .72); backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px); box-shadow: 0 30px 90px rgba(0,0,0,.5), 0 0 40px rgba(0,210,255,.1), inset 0 1px rgba(255,255,255,.08); }
+.login-panel-heading h2 { font-family: var(--display); font-size: 30px; letter-spacing: 0; }
+.login-panel-heading p { color: rgba(215,226,244,.66); }
+.login-submit { justify-content: center; font-family: var(--display); font-size: 16px; letter-spacing: 0; }
+.login-submit span { font-family: var(--display); font-size: 16px; letter-spacing: 0; }
+.login-panel-footer { color: rgba(215,226,244,.46); }
+
+@media (max-width: 760px) {
+  .login-page { display: flex; padding: 14px; }
+  .login-layout { width: 100%; margin: auto; display: block; }
+  .login-panel { padding: 30px 22px 22px; }
+  .login-panel-heading h2 { font-size: 24px; }
+  .timer-dial-mark { transform-origin: 50% 95px; }
+  .timer-dial-number { transform-origin: 50% 81px; }
+  .timer-astrolabe .timer-clock { font-size: 43px; }
+}
+
+/* clock.html 完整星轨视觉层：计时数值由任务计时器实时驱动。 */
+.timer-clock-shell {
+  --cosmic-dark: #05070f;
+  --cosmic-bg: radial-gradient(circle at 50% 50%, #0d1226 0%, #05070e 100%);
+  --neon-blue: #00d2ff;
+  --neon-mint: #2dd4bf;
+  --neon-pink: #f43f5e;
+  --neon-purple: #b19ffb;
+  --neon-yellow: #fbbf24;
+  position: relative;
+  z-index: 10;
+  width: min(540px, calc(100vw - 28px));
+  min-height: 760px;
+  max-height: calc(100vh - 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 28px;
+  background: rgba(13,20,38,.45);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  box-shadow: 0 24px 60px rgba(0,0,0,.6), inset 0 1px rgba(255,255,255,.08);
+  transform-style: preserve-3d;
+  transition: transform .5s cubic-bezier(.2,.8,.2,1);
+}
+.timer-clock-shell:hover { transform: translateY(-4px) rotateX(2deg); }
+.timer-clock-shell > *:not(.starfield):not(.glow-blob) { position: relative; z-index: 10; }
+.timer-clock-shell .starfield { position: absolute; inset: 0; z-index: 1; pointer-events: none; background-image: radial-gradient(1px 1px at 20px 30px,#eee,transparent), radial-gradient(1.5px 1.5px at 150px 80px,#fff,transparent), radial-gradient(2px 2px at 300px 200px,rgba(0,210,255,.3),transparent), radial-gradient(1.5px 1.5px at 500px 400px,#fff,transparent), radial-gradient(1px 1px at 700px 100px,#ddd,transparent), radial-gradient(2px 2px at 900px 600px,rgba(177,159,251,.3),transparent); background-size: 1000px 1000px; opacity: .55; animation: timerStarDrift 120s linear infinite; }
+.timer-clock-shell .glow-blob { position: absolute; width: 260px; height: 260px; border-radius: 50%; filter: blur(80px); z-index: 2; opacity: .25; pointer-events: none; animation: timerBlobBreathe 16s ease-in-out infinite alternate; }
+.timer-clock-shell .blob-blue { left: -80px; top: -80px; background: var(--neon-blue); }
+.timer-clock-shell .blob-purple { right: -80px; bottom: -80px; background: var(--neon-purple); animation-delay: -8s; }
+.timer-clock-shell .clock-brand { text-align: center; pointer-events: none; }
+.timer-clock-shell .brand-kicker { color: var(--neon-blue); font-size: 10px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; text-shadow: 0 0 10px rgba(0,210,255,.3); }
+.timer-clock-shell .brand-title { margin: 4px 0 0; color: rgba(255,255,255,.85); font-family: var(--display); font-size: 18px; font-weight: 400; letter-spacing: 1px; }
+.timer-task-meta { max-width: 390px; margin: 5px auto 0; overflow: hidden; color: rgba(255,255,255,.42); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.timer-clock-close { position: absolute !important; top: 22px; right: 22px; z-index: 20 !important; color: rgba(255,255,255,.5); }
+.timer-clock-shell .astrolabe-face { position: relative; width: min(340px, 70vw); height: min(340px, 70vw); flex: 0 0 auto; margin: 22px 0 0; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; background: radial-gradient(circle,rgba(16,26,50,.5),rgba(5,7,15,.85)); box-shadow: inset 0 0 40px rgba(0,0,0,.8),0 0 30px rgba(0,210,255,.05); display: flex; align-items: center; justify-content: center; }
+.timer-clock-shell .constellation-disc { position: absolute; inset: 15px; border: 1px dashed rgba(255,255,255,.04); border-radius: 50%; background-image: radial-gradient(circle at 35% 45%,rgba(0,210,255,.12),transparent 60%),radial-gradient(circle at 65% 55%,rgba(177,159,251,.12),transparent 60%); opacity: .8; animation: timerDiscRotate 180s linear infinite; }
+.timer-clock-shell .constellation-disc::after { content: ""; position: absolute; inset: 30px; border: 1px solid rgba(255,255,255,.02); border-radius: 50%; background: linear-gradient(30deg,transparent 47%,rgba(255,255,255,.08) 48% 49%,transparent 50%),linear-gradient(145deg,transparent 47%,rgba(255,255,255,.06) 48% 49%,transparent 50%); }
+.timer-clock-shell .orbital-progress { position: absolute; inset: 35px; width: 270px; height: 270px; transform: rotate(-90deg); pointer-events: none; }
+.timer-clock-shell .orbit-ring { fill: none; stroke-linecap: round; transition: stroke-dashoffset .35s cubic-bezier(.4,0,.2,1); }
+.timer-clock-shell .clock-dial-marks { position: absolute; inset: 0; pointer-events: none; }
+.timer-clock-shell .dial-mark { position: absolute; left: 50%; top: 10px; width: 2px; height: 8px; background: rgba(255,255,255,.15); transform-origin: 50% 160px; }
+.timer-clock-shell .dial-mark.major { width: 3px; height: 14px; background: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
+.timer-clock-shell .dial-number { position: absolute; left: 50%; top: 24px; color: rgba(255,255,255,.4); font-size: 11px; font-weight: 600; transform: translateX(-50%); transform-origin: 50% 146px; }
+.timer-clock-shell .hand-container { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.timer-clock-shell .hour-hand-wrap,.timer-clock-shell .minute-hand-wrap,.timer-clock-shell .second-hand-wrap { position: absolute; width: 100%; height: 100%; transform-origin: center; transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+.timer-clock-shell .hour-hand { position: absolute; left: calc(50% - 4px); bottom: 50%; width: 8px; height: 70px; border-radius: 6px; background: linear-gradient(to top,rgba(0,210,255,.2),var(--neon-blue)); box-shadow: 0 0 15px rgba(0,210,255,.4); transform-origin: bottom center; }
+.timer-clock-shell .hour-hand::after { content: ""; position: absolute; top: 6px; left: 2px; width: 4px; height: 15px; border-radius: 2px; background: #fff; opacity: .7; }
+.timer-clock-shell .minute-hand { position: absolute; left: calc(50% - 2.5px); bottom: 50%; width: 5px; height: 105px; border-radius: 4px; background: linear-gradient(to top,rgba(45,212,191,.2),var(--neon-mint)); box-shadow: 0 0 15px rgba(45,212,191,.4); transform-origin: bottom center; }
+.timer-clock-shell .second-hand { position: absolute; left: calc(50% - 1px); bottom: 50%; width: 2px; height: 125px; background: var(--neon-pink); box-shadow: 0 0 18px var(--neon-pink); transform-origin: bottom center; }
+.timer-clock-shell .second-hand::before { content: ""; position: absolute; top: -12px; left: -5px; width: 12px; height: 12px; border: 2px solid var(--neon-pink); border-radius: 50%; background: var(--cosmic-dark); box-shadow: 0 0 8px var(--neon-pink); }
+.timer-clock-shell .center-cap { position: absolute; z-index: 20; width: 18px; height: 18px; border: 4px solid var(--cosmic-dark); border-radius: 50%; background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.8); }
+.timer-clock-shell .digital-board { margin-top: 14px; text-align: center; }
+.timer-clock-shell .digital-time { display: flex; align-items: center; justify-content: center; gap: 4px; color: #fff; font-family: "Share Tech Mono",var(--numeric); font-size: 38px; letter-spacing: 1px; line-height: 1; text-shadow: 0 0 20px rgba(255,255,255,.15),0 0 2px rgba(255,255,255,.6); }
+.timer-clock-shell .digital-date { margin-top: 6px; color: rgba(255,255,255,.4); font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+.timer-clock-shell .timer-status { display: inline-block; margin-top: 10px; padding: 4px 8px; border: 1px solid rgba(0,210,255,.25); border-radius: 4px; background: rgba(0,210,255,.08); color: var(--neon-blue); font-size: 10px; font-weight: 900; }
+.timer-clock-shell .timer-status[data-state="paused"] { border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.08); color: var(--neon-yellow); }
+.timer-clock-shell .timer-status[data-state="completed"] { border-color: rgba(45,212,191,.35); background: rgba(45,212,191,.08); color: var(--neon-mint); }
+.timer-clock-shell .timer-elapsed { margin-top: 10px; color: rgba(255,255,255,.4); }
+.timer-clock-shell .timer-control-panel { position: relative; z-index: 12; margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.08); }
+.timer-clock-shell .action-btn { flex: 1; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin: 0 6px; border: 1px solid rgba(255,255,255,.08); border-radius: 20px; background: rgba(255,255,255,.02); color: rgba(255,255,255,.65); font-size: 11px; font-weight: 600; letter-spacing: 1px; transition: all .2s ease; }
+.timer-clock-shell .action-btn svg { width: 14px; height: 14px; }
+.timer-clock-shell .action-btn:hover,.timer-clock-shell .action-btn.is-active { border-color: var(--neon-blue); background: rgba(0,210,255,.12); color: var(--neon-blue); box-shadow: 0 0 15px rgba(0,210,255,.15); }
+.timer-clock-shell .timer-setup { width: 100%; margin-top: 20px; }
+.timer-clock-shell .timer-actions { width: 100%; }
+.timer-clock-shell .audio-notice { position: static; margin-top: 13px; color: rgba(255,255,255,.25); font-size: 9px; letter-spacing: 1px; }
+@keyframes timerStarDrift { from { background-position: 0 0; } to { background-position: 1000px 1000px; } }
+@keyframes timerDiscRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes timerBlobBreathe { from { transform: scale(1) translate(0,0); } to { transform: scale(1.25) translate(40px,30px); } }
+
+@media (max-width: 600px) {
+  .timer-clock-shell { width: calc(100vw - 28px); min-height: 700px; padding: 24px 18px; border-radius: 22px; }
+  .timer-clock-shell .timer-clock-close { top: 16px; right: 14px; }
+  .timer-clock-shell .astrolabe-face { width: min(300px, 78vw); height: min(300px, 78vw); }
+  .timer-clock-shell .orbital-progress { inset: 15px; width: calc(100% - 30px); height: calc(100% - 30px); }
+  .timer-clock-shell .dial-mark { transform-origin: 50% 135px; }
+  .timer-clock-shell .dial-number { transform-origin: 50% 121px; }
+  .timer-clock-shell .hour-hand { height: 58px; }
+  .timer-clock-shell .minute-hand { height: 86px; }
+  .timer-clock-shell .second-hand { height: 103px; }
+  .timer-clock-shell .digital-time { font-size: 34px; }
+  .timer-clock-shell .timer-control-panel { flex-wrap: wrap; gap: 8px; }
+  .timer-clock-shell .action-btn { margin: 0; min-width: 0; }
+  .timer-clock-shell .action-btn span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#0b101b">
   <title>长夏学程</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='10') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='22') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='25') }}">
   <script src="{{ url_for('static', filename='vendor/lucide.min.js', v='4') }}" defer></script>
   <script>
     window.APP_USER = {{ {"role": role, "displayName": display_name, "username": username, "canManageUsers": can_manage_users}|tojson }};
   </script>
-  <script src="{{ url_for('static', filename='app.js', v='22') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='25') }}" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -181,34 +181,56 @@
   {% endif %}
 
   <div class="modal-backdrop timer-backdrop" id="timerModal" hidden>
-    <div class="timer-dialog" role="dialog" aria-modal="true" aria-labelledby="timerTitle">
-      <div class="timer-heading">
-        <div>
-          <span class="section-kicker">FOCUS TIMER</span>
-          <h2 id="timerTitle">任务计时</h2>
-          <p id="timerTaskMeta"></p>
+    <div class="timer-dialog clock-shell timer-clock-shell" id="timerClockShell" role="dialog" aria-modal="true" aria-labelledby="timerTitle">
+      <div class="starfield" aria-hidden="true"></div>
+      <div class="glow-blob blob-blue" aria-hidden="true"></div>
+      <div class="glow-blob blob-purple" aria-hidden="true"></div>
+
+      <header class="clock-brand">
+        <span class="brand-kicker">CHANGXIA LEARNING · FOCUS TIMER</span>
+        <h2 class="brand-title" id="timerTitle">星轨仪时空舱</h2>
+        <p class="timer-task-meta" id="timerTaskMeta"></p>
+      </header>
+      <button class="icon-button timer-clock-close" type="button" data-close-modal="timerModal" title="关闭计时器" aria-label="关闭计时器"><i data-lucide="x"></i></button>
+
+      <div class="astrolabe-face" id="timerDial">
+        <div class="constellation-disc" aria-hidden="true"></div>
+        <svg class="orbital-progress" viewBox="0 0 270 270" aria-hidden="true">
+          <circle class="orbit-ring" cx="135" cy="135" r="120" stroke="rgba(244,63,94,.12)" stroke-width="2" />
+          <circle class="orbit-ring" id="timerSecOrbit" cx="135" cy="135" r="120" stroke="var(--neon-pink)" stroke-width="2.5" stroke-dasharray="753.98" stroke-dashoffset="0" filter="drop-shadow(0 0 4px #f43f5e)" />
+          <circle class="orbit-ring" cx="135" cy="135" r="100" stroke="rgba(45,212,191,.08)" stroke-width="3" />
+          <circle class="orbit-ring" id="timerMinOrbit" cx="135" cy="135" r="100" stroke="var(--neon-mint)" stroke-width="4.5" stroke-dasharray="628.318" stroke-dashoffset="0" filter="drop-shadow(0 0 4px #2dd4bf)" />
+          <circle class="orbit-ring" cx="135" cy="135" r="80" stroke="rgba(0,210,255,.08)" stroke-width="4" />
+          <circle class="orbit-ring" id="timerOrbitProgress" cx="135" cy="135" r="80" stroke="var(--neon-blue)" stroke-width="6" stroke-dasharray="502.65" stroke-dashoffset="0" filter="drop-shadow(0 0 4px #00d2ff)" />
+        </svg>
+        <div class="clock-dial-marks" id="timerDialMarks" aria-hidden="true"></div>
+        <div class="hand-container" aria-hidden="true">
+          <div class="hour-hand-wrap" id="timerHourHand"><div class="hour-hand"></div></div>
+          <div class="minute-hand-wrap" id="timerMinHand"><div class="minute-hand"></div></div>
+          <div class="second-hand-wrap" id="timerSecHand"><div class="second-hand"></div></div>
+          <div class="center-cap"></div>
         </div>
-        <button class="icon-button" type="button" data-close-modal="timerModal" title="关闭计时器" aria-label="关闭计时器"><i data-lucide="x"></i></button>
       </div>
 
-      <div class="timer-dial" id="timerDial">
-        <div class="timer-dial-inner">
-          <div class="timer-clock" id="timerClock" aria-live="polite">20:00</div>
-          <span class="timer-status" id="timerStatus">准备开始</span>
-        </div>
+      <div class="digital-board timer-digital-board">
+        <div class="digital-time"><span id="timerClock" aria-live="polite">20:00</span></div>
+        <div class="digital-date" id="timerDate">剩余时间倒计时</div>
+        <span class="timer-status" id="timerStatus">准备开始</span>
       </div>
       <div class="timer-elapsed" id="timerElapsedLabel">已学习 0 分钟</div>
       <div class="timer-progress" aria-hidden="true"><span id="timerProgressBar"></span></div>
 
+      <footer class="control-panel timer-control-panel">
+        <button class="action-btn" id="btnSound" type="button" title="开关机械滴答声"><i data-lucide="volume-2"></i><span>滴答声</span></button>
+        <button class="action-btn" id="btnAmbient" type="button" title="开关环境脉冲背景音"><i data-lucide="music-2"></i><span>星空混响</span></button>
+        <button class="action-btn" id="btnTheme" type="button" title="切换光晕色系"><i data-lucide="palette"></i><span>变换星云</span></button>
+      </footer>
+
       <div class="timer-setup" id="timerSetup">
         <label for="timerDuration">本次学习时间</label>
-        <div class="duration-control">
-          <input id="timerDuration" type="number" min="1" max="240" step="5" inputmode="numeric">
-          <span>分钟</span>
-        </div>
+        <div class="duration-control"><input id="timerDuration" type="number" min="1" max="240" step="5" inputmode="numeric"><span>分钟</span></div>
         <p id="timerSuggestion">建议 20 分钟</p>
       </div>
-
       <div class="timer-actions">
         <button class="timer-button primary" id="timerStart" type="button"><i data-lucide="play"></i><span>开始专注</span></button>
         <button class="timer-button primary" id="timerResume" type="button" hidden><i data-lucide="play"></i><span>继续计时</span></button>
@@ -217,6 +239,7 @@
         <button class="timer-button ghost" id="timerReset" type="button" hidden><i data-lucide="rotate-ccw"></i><span>重新计时</span></button>
       </div>
       <p class="timer-note">计时结束后，任务仍需上传成果并手动标记为已完成。</p>
+      <span class="audio-notice">本星盘支持 Web Audio 合成器音效，请放心点击交互</span>
     </div>
   </div>
 </body>
