@@ -135,13 +135,13 @@ class StudyPlanAppTest(unittest.TestCase):
         page = self.client.get("/")
         self.assertEqual(page.status_code, 200)
         html = page.get_data(as_text=True)
-        self.assertIn("/static/app.css?v=19", html)
-        self.assertIn("/static/app.js?v=19", html)
+        self.assertIn("/static/app.css?v=22", html)
+        self.assertIn("/static/app.js?v=22", html)
         self.assertNotIn("app_v14", html)
 
         anonymous = app.test_client()
         login_html = anonymous.get("/login").get_data(as_text=True)
-        self.assertIn("/static/app.css?v=19", login_html)
+        self.assertIn("/static/app.css?v=22", login_html)
         self.assertNotIn("login_v12", login_html)
 
     def test_cheese_vocabulary_task_and_existing_progress_are_preserved(self):

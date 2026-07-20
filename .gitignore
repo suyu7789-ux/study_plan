@@ -19,3 +19,4 @@ thumbs/
 .coverage
 htmlcov/
 node_modules/
+output/

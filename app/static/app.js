@@ -54,9 +54,11 @@ function miniProgressRing(rate) {
   const circumference = 113.097; // 2 * Math.PI * 18
   const offset = circumference - (rate / 100) * circumference;
   return `
-    <svg class="progress-ring" width="40" height="40" aria-label="进度：${rate}%">
+    <svg class="progress-ring" width="40" height="40" role="img" aria-label="进度：${rate}%">
       <circle class="progress-ring-bg" stroke="rgba(255, 255, 255, 0.05)" stroke-width="3" fill="transparent" r="18" cx="20" cy="20"/>
-      <circle class="progress-ring-bar" stroke="var(--subject-color)" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-width="3" stroke-linecap="round" fill="transparent" r="18" cx="20" cy="20"/>
+      <circle class="progress-ring-bar" data-progress-offset="${offset}" stroke="var(--subject-color)" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}" stroke-width="3" stroke-linecap="round" fill="transparent" r="18" cx="20" cy="20">
+        <animate attributeName="stroke-dashoffset" from="${circumference}" to="${offset}" dur="850ms" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".22 .75 .24 1"/>
+      </circle>
     </svg>
   `;
 }
@@ -65,9 +67,11 @@ function largeProgressRing(rate, subject) {
   const circumference = 314.159; // 2 * Math.PI * 50
   const offset = circumference - (rate / 100) * circumference;
   return `
-    <svg class="progress-ring" width="116" height="116" aria-label="${subject}进度：${rate}%">
+    <svg class="progress-ring" width="116" height="116" role="img" aria-label="${subject}进度：${rate}%">
       <circle class="progress-ring-bg" stroke="rgba(255, 255, 255, 0.05)" stroke-width="6" fill="transparent" r="50" cx="58" cy="58"/>
-      <circle class="progress-ring-bar" stroke="var(--subject-color)" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-width="6" stroke-linecap="round" fill="transparent" r="50" cx="58" cy="58"/>
+      <circle class="progress-ring-bar" data-progress-offset="${offset}" stroke="var(--subject-color)" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}" stroke-width="6" stroke-linecap="round" fill="transparent" r="50" cx="58" cy="58">
+        <animate attributeName="stroke-dashoffset" from="${circumference}" to="${offset}" dur="850ms" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".22 .75 .24 1"/>
+      </circle>
     </svg>
   `;
 }
@@ -171,10 +175,14 @@ function imageCell(task) {
     `).join("")
     : `<div class="image-empty">暂无图片</div>`;
 
+  const guideId = `evidence-guide-${escapeHtml(task.id)}`;
   const guideTooltipHtml = `
     <div class="evidence-guide-tooltip">
-      <i data-lucide="help-circle" class="guide-icon"></i>
-      <div class="tooltip-box">
+      <button class="evidence-guide-trigger" type="button" data-evidence-guide
+              aria-label="查看成果图片拍摄要求" aria-expanded="false" aria-controls="${guideId}">
+        <i data-lucide="circle-help"></i>
+      </button>
+      <div class="tooltip-box" id="${guideId}" role="tooltip">
         <h4>成果图片拍摄要求：</h4>
         ${orderedList(task.evidence_guide, "tooltip-list")}
       </div>
@@ -212,7 +220,8 @@ function timerButton(task) {
     <button class="task-timer-button ${timerState === "running" ? "is-running" : ""}"
             type="button" data-timer-task="${task.id}" title="打开任务计时器">
       <i data-lucide="timer"></i>
-      <span><strong class="timer-button-label">${label}${pulseHtml}</strong><small>建议 ${task.planned_minutes} 分钟</small></span>
+      <span><strong class="timer-button-label">${label}</strong><small>建议 ${task.planned_minutes} 分钟</small></span>
+      ${pulseHtml}
     </button>
   `;
 }
@@ -412,6 +421,14 @@ function closeModal(id) {
   document.getElementById(id).hidden = true;
 }
 
+function closeEvidenceGuides(except = null) {
+  document.querySelectorAll(".evidence-guide-tooltip.is-open").forEach((tooltip) => {
+    if (tooltip === except) return;
+    tooltip.classList.remove("is-open");
+    tooltip.querySelector("[data-evidence-guide]")?.setAttribute("aria-expanded", "false");
+  });
+}
+
 function renderUsers(users) {
   document.getElementById("userCount").textContent = `${users.length} 个`;
   document.getElementById("userList").innerHTML = users.map((user) => `
@@ -550,6 +567,16 @@ document.addEventListener("focusout", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  const guideButton = event.target.closest("[data-evidence-guide]");
+  if (guideButton) {
+    const tooltip = guideButton.closest(".evidence-guide-tooltip");
+    const willOpen = !tooltip.classList.contains("is-open");
+    closeEvidenceGuides(tooltip);
+    tooltip.classList.toggle("is-open", willOpen);
+    guideButton.setAttribute("aria-expanded", String(willOpen));
+    return;
+  }
+  closeEvidenceGuides();
   const detailButton = event.target.closest("[data-toggle-details]");
   if (detailButton) {
     const taskId = detailButton.dataset.toggleDetails;
@@ -722,6 +749,7 @@ document.getElementById("passwordForm").addEventListener("submit", async (event)
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    closeEvidenceGuides();
     document.querySelectorAll(".modal-backdrop:not([hidden])").forEach((modal) => { modal.hidden = true; });
     closeSidebar();
   }
