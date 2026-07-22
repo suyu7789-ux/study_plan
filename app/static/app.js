@@ -603,7 +603,7 @@ async function initSupervisorStudentSelector() {
 
   try {
     const res = await api("/api/supervisor/students");
-    if (res.ok && res.students && res.students.length > 0) {
+    if (res && res.students && res.students.length > 0) {
       select.innerHTML = res.students.map(s => `<option value="${escapeHtml(s.username)}">${escapeHtml(s.display_name)} (${escapeHtml(s.username)})</option>`).join("");
       state.selectedStudent = res.students[0].username;
 
@@ -618,6 +618,7 @@ async function initSupervisorStudentSelector() {
     }
   } catch (err) {
     console.error("加载监督学生失败:", err);
+    select.innerHTML = '<option value="">暂无学生</option>';
   }
 }
 
@@ -1358,7 +1359,9 @@ document.addEventListener("keydown", (event) => {
 
 async function start() {
   try {
-    await initSupervisorStudentSelector();
+    if (role === "supervisor" || canManageUsers) {
+      initSupervisorStudentSelector().catch((err) => console.error("初始化监督者选户错误:", err));
+    }
     await loadSummary();
     await loadTasks();
     await restoreActiveTimer();
@@ -1376,12 +1379,18 @@ start();
 /* AI AGENT 3D 太空萌宠与双端自适应对话系统 JS 驱动核心 */
 /* =================================================== */
 
-document.addEventListener("DOMContentLoaded", () => {
+function bootAgentPetAndDrawer() {
   if (document.getElementById("webglContainer")) {
     initAgentPet();
     initAgentDrawer();
   }
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootAgentPetAndDrawer);
+} else {
+  bootAgentPetAndDrawer();
+}
 
 let agentThreeScene, agentCamera, agentRenderer;
 let agentRobotGroup, agentHead, agentBody, agentLeftEar, agentRightEar, agentLeftEye, agentRightEye;
