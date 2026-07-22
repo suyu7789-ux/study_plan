@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b101b">
   <title>长夏学程</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='10') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='43') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='44') }}">
   <script src="{{ url_for('static', filename='vendor/lucide.min.js', v='4') }}" defer></script>
   <script src="{{ url_for('static', filename='vendor/three.min.js', v='1') }}"></script>
   <script>
@@ -19,7 +19,7 @@
   <script>
     window.APP_USER = {{ {"role": role, "displayName": display_name, "username": username, "canManageUsers": can_manage_users}|tojson }};
   </script>
-  <script src="{{ url_for('static', filename='app.js', v='43') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='44') }}" defer></script>
 </head>
 <body>
   <div class="app-shell">

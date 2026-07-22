@@ -1392,6 +1392,16 @@ start();
 /* AI AGENT 3D 太空萌宠与双端自适应对话系统 JS 驱动核心 */
 /* =================================================== */
 
+function applyPetFallbackAvatar() {
+  const container = document.getElementById("webglContainer");
+  if (!container) return;
+  container.innerHTML = `
+    <img src="/static/cx_study_pet.jpg" alt="AI 伴学萌宠" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;">
+  `;
+}
+
+let agentPetInitAttempts = 0;
+
 function bootAgentPetAndDrawer() {
   if (document.getElementById("webglContainer")) {
     initAgentPet();
@@ -1430,18 +1440,25 @@ function initAgentPet() {
   if (!container) return;
 
   if (typeof THREE === "undefined" || !window.THREE) {
+    agentPetInitAttempts++;
+    if (agentPetInitAttempts > 25) {
+      applyPetFallbackAvatar();
+      return;
+    }
     setTimeout(initAgentPet, 100);
     return;
   }
 
-  agentThreeScene = new THREE.Scene();
-  agentCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  agentCamera.position.set(0, -0.15, 3.2);
+  try {
+    agentThreeScene = new THREE.Scene();
+    agentCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    agentCamera.position.set(0, -0.15, 3.2);
 
-  agentRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
-  agentRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  agentRenderer.setSize(100, 100);
-  container.appendChild(agentRenderer.domElement);
+    agentRenderer = new THREE.WebGLRenderer({ alpha: false, antialias: true, preserveDrawingBuffer: true });
+    agentRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    agentRenderer.setSize(100, 100);
+    agentRenderer.setClearColor(0x131c31, 1.0);
+    container.appendChild(agentRenderer.domElement);
 
   agentRobotGroup = new THREE.Group();
   agentThreeScene.add(agentRobotGroup);
@@ -1598,6 +1615,10 @@ function initAgentPet() {
       console.error("Pet avatar capture failed:", e);
     }
   }, 150);
+  } catch (err) {
+    console.error("WebGL 3D 萌宠初始化捕获失败，降级为 2D 伴学萌宠图片:", err);
+    applyPetFallbackAvatar();
+  }
 
   // 绑动手势/鼠标监听
   document.addEventListener("mousemove", (e) => {
