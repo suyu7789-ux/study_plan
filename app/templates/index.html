@@ -6,12 +6,20 @@
   <meta name="theme-color" content="#0b101b">
   <title>长夏学程</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='10') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='32') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='34') }}">
   <script src="{{ url_for('static', filename='vendor/lucide.min.js', v='4') }}" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']], processEscapes: true },
+      options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'svg'], ignoreHtmlClass: 'tex2jax_ignore' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script>
     window.APP_USER = {{ {"role": role, "displayName": display_name, "username": username, "canManageUsers": can_manage_users}|tojson }};
   </script>
-  <script src="{{ url_for('static', filename='app.js', v='32') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='34') }}" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -222,8 +230,33 @@
 
       <footer class="control-panel timer-control-panel">
         <button class="action-btn" id="btnSound" type="button" title="开关机械滴答声"><i data-lucide="volume-2"></i><span>滴答声</span></button>
-        <button class="action-btn" id="btnAmbient" type="button" title="开关环境脉冲背景音"><i data-lucide="music-2"></i><span>星空混响</span></button>
+        <button class="action-btn" id="btnAmbient" type="button" title="选择专注音乐" aria-expanded="false" aria-controls="musicPanel"><i data-lucide="music-2"></i><span>专注音乐</span></button>
         <button class="action-btn" id="btnTheme" type="button" title="切换光晕色系"><i data-lucide="palette"></i><span>变换星云</span></button>
+
+        <section class="music-panel" id="musicPanel" aria-label="专注音乐选择" hidden>
+          <header class="music-panel-header">
+            <div><span>FOCUS SOUND</span><strong id="musicPanelTitle">灵动流光</strong></div>
+            <button class="music-panel-close" id="musicPanelClose" type="button" title="收起音乐面板" aria-label="收起音乐面板"><i data-lucide="x"></i></button>
+          </header>
+          <div class="music-options" role="radiogroup" aria-label="音乐风格">
+            <button class="music-option is-selected" type="button" role="radio" aria-checked="true" data-music-style="flow">
+              <span class="music-option-dot"></span><span><strong>灵动流光</strong><small>清亮 · 流动 · 水晶琶音</small></span>
+            </button>
+            <button class="music-option" type="button" role="radio" aria-checked="false" data-music-style="moon">
+              <span class="music-option-dot"></span><span><strong>月海浮光</strong><small>舒缓 · 空灵 · 柔和长音</small></span>
+            </button>
+            <button class="music-option" type="button" role="radio" aria-checked="false" data-music-style="pulse">
+              <span class="music-option-dot"></span><span><strong>深空脉冲</strong><small>律动 · 克制 · 低频节拍</small></span>
+            </button>
+            <button class="music-option" type="button" role="radio" aria-checked="false" data-music-style="rain">
+              <span class="music-option-dot"></span><span><strong>雨夜星尘</strong><small>静谧 · 细雨 · 偶发铃音</small></span>
+            </button>
+          </div>
+          <div class="music-panel-controls">
+            <button class="music-power" id="musicPower" type="button"><i data-lucide="play"></i><span>开始播放</span></button>
+            <label class="music-volume" for="musicVolume"><i data-lucide="volume-2"></i><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="0.42"><span id="musicVolumeValue">42%</span></label>
+          </div>
+        </section>
       </footer>
 
       <div class="timer-setup" id="timerSetup">
@@ -242,5 +275,116 @@
       <span class="audio-notice">本星盘支持 Web Audio 合成器音效，请放心点击交互</span>
     </div>
   </div>
+
+  <!-- ========================================== -->
+  <!-- 3D 萌宠悬浮挂件与 AI 伴学对话抽屉 HTML DOM -->
+  <!-- ========================================== -->
+
+  <!-- 1. 3D 萌宠悬浮挂件 -->
+  <div class="desktop-pet-container" id="desktopPetContainer">
+    <div class="pet-speech-bubble" id="petSpeechBubble">
+      我是 3D 太空伴学猫～点击我和我聊天吧！✨
+    </div>
+    <div class="pet-avatar-body" id="petAvatarBody">
+      <div class="webgl-container" id="webglContainer"></div>
+    </div>
+    <div class="pet-tooltip">点击展开 AI 伴学对话</div>
+  </div>
+
+  <!-- 2. 背景遮罩 (用于移动端滑出抽屉) -->
+  <div class="agent-drawer-backdrop" id="agentDrawerBackdrop"></div>
+
+  <!-- 3. AI Agent 抽屉对话面板 -->
+  <div class="agent-panel is-closed" id="agentPanel">
+    <div class="drawer-handle-bar" id="drawerHandleBar">
+      <div class="drawer-handle-line"></div>
+    </div>
+    
+    <div class="agent-header">
+      <div class="agent-header-left">
+        <div class="agent-avatar">
+          <img src="{{ url_for('static', filename='cx_study_pet.jpg') }}" alt="CX-Agent" id="headerAvatar">
+        </div>
+        <div class="agent-title-info">
+          <h2>CX-Agent</h2>
+          <span>在线 · 智能学习管家</span>
+        </div>
+      </div>
+      <div class="agent-header-actions" style="display: flex; gap: 8px;">
+        <button class="close-panel-btn" id="historyBtn" title="查看历史记录" style="background: transparent;">
+          <i data-lucide="clock"></i>
+        </button>
+        <button class="close-panel-btn" id="closePanelBtn" title="收起面板">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 消息流展示区 -->
+    <div class="agent-messages" id="chatHistory"></div>
+
+    <!-- 推荐 Chips -->
+    <div class="agent-chips">
+      <div class="chip" data-text="如何高效完成今天的物理任务？">如何完成物理任务？</div>
+      <div class="chip" data-text="化学同分异构体知识卡？">化学同分异构卡</div>
+      <div class="chip" data-text="学习有点累了，求鼓励！">求鼓励！</div>
+    </div>
+
+    <!-- 任务绑定 Selector -->
+    <div class="agent-context-bar">
+      <span class="context-label">🎯 关联任务:</span>
+      <select class="context-select" id="contextSelect">
+        <option value="">-- 自由提问 --</option>
+      </select>
+    </div>
+
+    <!-- 附件上传预览滑出条 -->
+    <div class="upload-preview-container" id="uploadPreviewContainer" style="display: none;">
+      <div class="upload-preview-card">
+        <div class="upload-preview-icon-wrapper" id="uploadPreviewIconWrapper">
+          <img src="" class="upload-preview-thumb" id="uploadPreviewThumb">
+          <div id="uploadPreviewFileIcon" style="display: none;"></div>
+        </div>
+        <span class="upload-preview-name" id="uploadPreviewName"></span>
+        <div class="upload-preview-remove" id="uploadPreviewRemove" title="移除文件">×</div>
+      </div>
+    </div>
+
+    <!-- 输入栏 -->
+    <div class="agent-input-container">
+      <button class="input-action-btn" id="attachBtn" title="上传附件/图片/文档">
+        <i data-lucide="paperclip"></i>
+      </button>
+      <input class="agent-input" type="text" id="chatInput" placeholder="关联任务提问，或发送语音/图片..." autocomplete="off">
+      <button class="input-action-btn" id="voiceBtn" title="按住语音">
+        <i data-lucide="mic"></i>
+      </button>
+      <button class="send-btn" id="sendBtn" title="发送消息">
+        <i data-lucide="send"></i>
+      </button>
+    </div>
+
+    <!-- 历史记录滑动抽屉层 -->
+    <div class="history-overlay" id="historyOverlay">
+      <div class="history-header">
+        <button class="back-chat-btn" id="backChatBtn" title="返回对话">
+          <i data-lucide="chevron-left"></i>
+        </button>
+        <h3>历史辅导记录</h3>
+      </div>
+      <div class="history-search-box">
+        <input type="text" id="historySearchInput" placeholder="搜索历史会话..." autocomplete="off">
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+
+    <!-- Loading & Toast 遮罩 -->
+    <div class="history-loading" id="historyLoading">
+      <div class="spinner"></div>
+      <div class="loading-text">正在同步历史会话数据...</div>
+    </div>
+    <div class="toast-alert" id="toastAlert">已成功载入历史会话！</div>
+  </div>
+
 </body>
 </html>

@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>长夏学程 - AI 3D 萌宠移动端悬浮挂件</title>
+  <style>
+    :root {
+      --bg-dark: #070a13;
+      --bg-panel: rgba(13, 19, 35, 0.65);
+      --bg-card: rgba(22, 33, 56, 0.7);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --text-primary: #ffffff;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+
+      /* 多巴胺学科配色 */
+      --math-blue: #00d2ff;
+      --physics-mint: #2dd4bf;
+      --chemistry-coral: #ff5d9e;
+      --english-purple: #8c70ed;
+
+      --neon-glow-physics: 0 0 15px rgba(45, 212, 191, 0.25);
+      --neon-glow-agent: 0 0 20px rgba(45, 212, 191, 0.45);
+      --neon-glow-pet: 0 0 25px rgba(45, 212, 191, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 15%, #111b36 0%, transparent 50%),
+        radial-gradient(circle at 50% 85%, #0d2929 0%, transparent 50%);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 移动端主界面视窗 */
+    .mobile-dashboard {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 16px;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding-bottom: 120px; /* 留出底部悬浮挂件避让区 */
+    }
+
+    .plan-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .brand-mark {
+      font-size: 18px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-mark span {
+      background: linear-gradient(135deg, var(--math-blue), var(--physics-mint));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .date-badge {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-glass);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .dashboard-content {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 圆形进度卡片 */
+    .mobile-overview-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      padding: 18px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .progress-radial {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .progress-radial svg {
+      transform: rotate(-90deg);
+      width: 68px;
+      height: 68px;
+    }
+
+    .progress-radial circle {
+      fill: none;
+      stroke-width: 5;
+    }
+
+    .progress-radial .bg {
+      stroke: rgba(255, 255, 255, 0.04);
+    }
+
+    .progress-radial .fg {
+      stroke: var(--physics-mint);
+      stroke-linecap: round;
+      stroke-dasharray: 188;
+      stroke-dashoffset: 75;
+      filter: drop-shadow(0 0 4px var(--physics-mint));
+    }
+
+    .progress-text {
+      position: absolute;
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .metric-info h3 {
+      margin: 0 0 4px 0;
+      font-size: 15.5px;
+    }
+
+    .metric-info p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* 倒计时专注卡 */
+    .mobile-timer-card {
+      background: linear-gradient(135deg, rgba(23, 35, 59, 0.8), rgba(12, 18, 33, 0.95));
+      border: 1px solid rgba(140, 112, 237, 0.35);
+      border-radius: 20px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4), var(--neon-glow-physics);
+    }
+
+    .timer-digits {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: monospace;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+
+    .timer-status {
+      font-size: 11px;
+      color: var(--physics-mint);
+      background: rgba(45, 212, 191, 0.1);
+      padding: 3px 8px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--physics-mint);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.7); }
+      70% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 0 6px rgba(45, 212, 191, 0); }
+      100% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); }
+    }
+
+    /* 任务列表 */
+    .mobile-tasks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .task-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+
+    .task-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+    }
+
+    .task-card.math::before { background: var(--math-blue); }
+    .task-card.physics::before { background: var(--physics-mint); }
+    .task-card.chemistry::before { background: var(--chemistry-coral); }
+    .task-card.english::before { background: var(--english-purple); }
+
+    .task-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .task-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .task-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .task-badge.done {
+      background: rgba(45, 212, 191, 0.1);
+      color: var(--physics-mint);
+      border: 1px solid rgba(45, 212, 191, 0.2);
+    }
+
+    .task-badge.todo {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-glass);
+    }
+
+    .task-badge.doing {
+      background: rgba(0, 210, 255, 0.1);
+      color: var(--math-blue);
+      border: 1px solid rgba(0, 210, 255, 0.2);
+    }
+
+    .task-desc {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+
+    /* ========================================== */
+    /* 移动端 3D 萌宠悬浮挂件 (Mobile Floating Pet Widget) */
+    /* ========================================== */
+    .mobile-pet-widget {
+      position: fixed;
+      right: 18px;
+      bottom: 24px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+      transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    /* 对话抽屉打开时，挂件略微向左或向上滑动 */
+    .mobile-pet-widget.drawer-open {
+      bottom: calc(88vh - 45px);
+      right: 20px;
+      transform: scale(0.75);
+    }
+
+    .pet-avatar-body {
+      width: 95px;
+      height: 95px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 50%, rgba(20, 30, 55, 0.4) 0%, rgba(5, 7, 15, 0.95) 100%);
+      border: 2px solid rgba(45, 212, 191, 0.3);
+      box-shadow: var(--neon-glow-pet);
+      position: relative;
+      overflow: visible;
+    }
+
+    .webgl-container {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      position: absolute;
+      inset: 0;
+    }
+
+    .mobile-speech-bubble {
+      position: absolute;
+      bottom: 105px;
+      right: 0;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 8px 12px;
+      width: 180px;
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: #ffffff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: scale(0.9) translateY(8px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      z-index: 1001;
+    }
+
+    .mobile-speech-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      right: 35px;
+      border-width: 6px 6px 0;
+      border-style: solid;
+      border-color: rgba(15, 23, 42, 0.9) transparent;
+    }
+
+    .mobile-speech-bubble.is-visible {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    .floating-heart {
+      position: absolute;
+      color: var(--chemistry-coral);
+      font-size: 14px;
+      text-shadow: 0 0 8px var(--chemistry-coral);
+      pointer-events: none;
+      animation: heartFloat var(--duration) ease-out forwards;
+      z-index: 2000;
+    }
+
+    @keyframes heartFloat {
+      0% { transform: translate(0, 0) scale(0.6); opacity: 1; }
+      100% { transform: translate(var(--dx), -90px) scale(1.3); opacity: 0; }
+    }
+
+    /* 悬浮挂件上的小提示圈 */
+    .widget-hint-badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      background: #10b981;
+      border: 2px solid #070a13;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+
+    /* ========================================== */
+    /* 移动端 AI 伴学对话抽屉 (Mobile Sliding Chat Drawer) */
+    /* ========================================== */
+    .mobile-chat-drawer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 88vh; /* 占据页面 88% 的高度 */
+      background: linear-gradient(170deg, rgba(12, 18, 33, 0.96) 0%, rgba(6, 9, 17, 0.98) 100%);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.7);
+      z-index: 900;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mobile-chat-drawer.is-open {
+      transform: translateY(0);
+    }
+
+    /* 抽屉顶部手势抓取条 (Drag Handle) */
+    .drawer-handle-bar {
+      width: 100%;
+      padding: 10px 0 4px 0;
+      display: flex;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .drawer-handle-line {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* 抽屉头部 */
+    .drawer-header {
+      padding: 10px 18px 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .drawer-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .drawer-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1.5px solid var(--physics-mint);
+      box-shadow: var(--neon-glow-physics);
+      background: transparent;
+      overflow: hidden;
+    }
+
+    .drawer-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .drawer-title-info h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .drawer-title-info span {
+      font-size: 10.5px;
+      color: var(--physics-mint);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .drawer-header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .drawer-action-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-glass);
+      color: var(--text-secondary);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: all 0.2s;
+    }
+
+    .drawer-action-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+
+    /* 消息区域 */
+    .drawer-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .drawer-messages::-webkit-scrollbar {
+      width: 3px;
+    }
+    .drawer-messages::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+    }
+
+    /* 消息气泡基础定义 */
+    .message {
+      max-width: 88%;
+      display: flex;
+      animation: messageIn 0.3s ease-out;
+    }
+
+    @keyframes messageIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.received { align-self: flex-start; gap: 10px; }
+    .message.sent { align-self: flex-end; justify-content: flex-end; }
+
+    .msg-avatar-wrapper {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(45, 212, 191, 0.4);
+      box-shadow: 0 0 8px rgba(45, 212, 191, 0.2);
+      overflow: hidden;
+      flex-shrink: 0;
+      background: transparent;
+    }
+
+    .msg-avatar-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .msg-content-wrapper { display: flex; flex-direction: column; gap: 4px; }
+
+    .msg-bubble {
+      padding: 12px 15px;
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+
+    .message.received .msg-bubble {
+      background: rgba(22, 33, 56, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-left: 3px solid var(--physics-mint);
+      border-top-left-radius: 3px;
+      color: #e2e8f0;
+    }
+
+    .message.sent .msg-bubble {
+      background: linear-gradient(135deg, rgba(45, 212, 191, 0.18) 0%, rgba(0, 210, 255, 0.12) 100%);
+      border: 1px solid rgba(45, 212, 191, 0.35);
+      border-top-right-radius: 3px;
+      color: #ffffff;
+    }
+
+    .msg-time { font-size: 9.5px; color: var(--text-muted); align-self: flex-start; margin-left: 3px; }
+    .message.sent .msg-time { align-self: flex-end; margin-right: 3px; }
+
+    /* 富文本 Markdown 与 MathJax 支持 */
+    .msg-bubble strong { color: #ffffff; font-weight: 700; }
+    .msg-bubble code { background: rgba(45, 212, 191, 0.12); border: 1px solid rgba(45, 212, 191, 0.25); color: var(--physics-mint); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+
+    .math-block {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px dashed rgba(45, 212, 191, 0.3);
+      padding: 8px;
+      border-radius: 6px;
+      text-align: center;
+      margin: 8px 0;
+      color: #ffffff;
+      font-size: 13px;
+    }
+
+    .chat-data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 11.5px;
+      background: rgba(10, 15, 28, 0.4);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .chat-data-table th { background: rgba(45, 212, 191, 0.12); color: var(--physics-mint); padding: 6px 8px; text-align: left; }
+    .chat-data-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); color: #d1d5db; }
+
+    /* 图像与文档卡片 */
+    .image-attachment-bubble { padding: 8px !important; background: rgba(23, 35, 59, 0.85) !important; max-width: 250px; }
+    .attachment-preview { background: rgba(10, 15, 28, 0.6); border-radius: 8px; overflow: hidden; margin-bottom: 6px; }
+    .attachment-preview.non-image { background: transparent !important; }
+    .attachment-info { padding: 6px 10px; display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); }
+    .file-name { color: #ffffff; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+
+    .file-download-card {
+      background: rgba(10, 15, 28, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+    }
+    .file-icon-box { width: 32px; height: 32px; border-radius: 6px; background: rgba(255, 255, 255, 0.03); display: grid; place-items: center; flex-shrink: 0; }
+    .file-card-icon { width: 18px; height: 18px; }
+    .file-text-box { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .file-text-box .file-name { font-size: 12px; color: #ffffff; font-weight: 600; }
+    .file-text-box .file-size { font-size: 10px; color: var(--text-muted); }
+    .file-download-action { color: var(--physics-mint); }
+
+    /* 芯片与 Selector */
+    .drawer-chips-wrapper {
+      padding: 8px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      white-space: nowrap;
+      border-top: 1px solid rgba(255,255,255,0.04);
+      background: rgba(5, 8, 16, 0.3);
+    }
+    .drawer-chips-wrapper::-webkit-scrollbar { display: none; }
+    .drawer-chip {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: 14px;
+      font-size: 11px;
+    }
+
+    .drawer-context-bar {
+      padding: 6px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      background: rgba(10, 15, 28, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .drawer-context-bar select {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 4px 6px;
+      color: #e2e8f0;
+      font-size: 11px;
+      outline: none;
+    }
+
+    /* 底部输入框 */
+    .drawer-input-container {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(10, 15, 28, 0.95);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .input-action-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px;
+      display: grid;
+      place-items: center;
+    }
+
+    .drawer-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 8px 14px;
+      color: #ffffff;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .drawer-send-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--physics-mint);
+      color: #070a13;
+      border: none;
+      display: grid;
+      place-items: center;
+    }
+
+    /* 移动端历史记录遮罩抽屉 */
+    .mobile-history-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(165deg, rgba(11, 16, 28, 0.99) 0%, rgba(6, 8, 15, 0.995) 100%);
+      z-index: 950;
+      transform: translateX(-100%);
+      transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .mobile-history-overlay.is-open { transform: translateX(0); }
+
+    .history-header { padding: 14px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .history-header h3 { margin: 0; font-size: 14px; color: #ffffff; }
+    .back-chat-btn { background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); color: var(--text-secondary); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; }
+
+    .history-list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .history-item { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+    .history-item::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 2px 2px 0; }
+    .history-item.math::before { background: var(--math-blue); }
+    .history-item.physics::before { background: var(--physics-mint); }
+    .history-item.chemistry::before { background: var(--chemistry-coral); }
+    .history-item.active { background: rgba(45, 212, 191, 0.04) !important; border-color: rgba(45, 212, 191, 0.3) !important; }
+    .history-item-top { display: flex; justify-content: space-between; align-items: center; }
+    .history-item-title { font-size: 12.5px; font-weight: 700; color: #ffffff; }
+    .history-item-date { font-size: 10px; color: var(--text-muted); }
+    .history-item-preview { font-size: 11px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 遮罩背景 (Backdrop) */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 850;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    .drawer-backdrop.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 局部 Loading & Toast */
+    .drawer-loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 28, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .spinner { width: 28px; height: 28px; border: 3px solid rgba(255,255,255,0.06); border-top-color: var(--physics-mint); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .drawer-toast {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-15px);
+      background: rgba(45, 212, 191, 0.2);
+      border: 1px solid rgba(45, 212, 191, 0.45);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 15px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 1100;
+      opacity: 0;
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    .drawer-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']], processEscapes: true },
+      options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'svg'], ignoreHtmlClass: 'tex2jax_ignore' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+  <!-- 1. 移动端主计划界面 (Study Plan Dashboard) -->
+  <div class="mobile-dashboard" id="mobileDashboard">
+    <div class="plan-header">
+      <div class="brand-mark">
+        <span>CX</span>
+        <strong>长夏学程</strong>
+      </div>
+      <div class="date-badge">2026-07-22 (今日)</div>
+    </div>
+
+    <div class="dashboard-content">
+      <!-- 进度概要卡片 -->
+      <div class="mobile-overview-card">
+        <div class="progress-radial">
+          <svg>
+            <circle class="bg" cx="34" cy="34" r="30" />
+            <circle class="fg" cx="34" cy="34" r="30" />
+          </svg>
+          <span class="progress-text">60%</span>
+        </div>
+        <div class="metric-info">
+          <h3>今日计划推进过半</h3>
+          <p>已完成 3 / 5 个任务节点<br>专注计时累计 75 分钟</p>
+        </div>
+      </div>
+
+      <!-- 计时器卡片 -->
+      <div class="mobile-timer-card">
+        <div class="timer-status">
+          <span class="pulse-dot"></span>
+          <span>物理专注中</span>
+        </div>
+        <div class="timer-digits">18:42</div>
+      </div>
+
+      <!-- 任务列表 -->
+      <div class="mobile-tasks-list">
+        <div class="task-card math">
+          <div class="task-card-top">
+            <span class="task-title">数学：高二衔接函数综合练习 (D06-M1)</span>
+            <span class="task-badge done">已完成</span>
+          </div>
+          <span class="task-desc">成果标准：上传手写习题本第12页的证明过程。</span>
+        </div>
+
+        <div class="task-card physics">
+          <div class="task-card-top">
+            <span class="task-title">物理：牛顿运动定律情境分析 (D06-P1)</span>
+            <span class="task-badge doing">进行中</span>
+          </div>
+          <span class="task-desc">专注要求：开启“灵动流光”背景音，探究斜面模型。</span>
+        </div>
+
+        <div class="task-card chemistry">
+          <div class="task-card-top">
+            <span class="task-title">化学：有机化学同分异构体 (D06-C1)</span>
+            <span class="task-badge done">已完成</span>
+          </div>
+          <span class="task-desc">成果标准：上传分子模型搭建照片或思维导图。</span>
+        </div>
+
+        <div class="task-card english">
+          <div class="task-card-top">
+            <span class="task-title">英语：奶酪单词 App 背单词 (D06-E1)</span>
+            <span class="task-badge todo">未开始</span>
+          </div>
+          <span class="task-desc">每日词汇：在 App 完成 20 个新单词背诵并截图。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 2. 移动端 3D 萌宠悬浮挂件 (Floating Pet Widget) -->
+  <div class="mobile-pet-widget" id="mobilePetWidget">
+    <div class="mobile-speech-bubble" id="mobileSpeechBubble">
+      Hi！我是 3D 太空伴学猫！点击我和我聊天吧！✨
+    </div>
+    <div class="pet-avatar-body" id="petAvatarBody">
+      <div class="widget-hint-badge"></div>
+      <div class="webgl-container" id="webglContainer"></div>
+    </div>
+  </div>
+
+
+  <!-- 3. 背景遮罩层 (Backdrop) -->
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+
+  <!-- 4. 滑出式 AI 伴学对话抽屉 (Mobile Sliding Chat Drawer) -->
+  <div class="mobile-chat-drawer" id="mobileChatDrawer">
+    
+    <!-- 顶部抓取指示条 -->
+    <div class="drawer-handle-bar" id="drawerHandleBar">
+      <div class="drawer-handle-line"></div>
+    </div>
+
+    <!-- 抽屉 Header -->
+    <div class="drawer-header">
+      <div class="drawer-header-left">
+        <div class="drawer-avatar">
+          <img src="cx_study_pet.jpg" id="drawerHeaderAvatar">
+        </div>
+        <div class="drawer-title-info">
+          <h2>CX-Agent</h2>
+          <span>在线 · 智能学习管家</span>
+        </div>
+      </div>
+      <div class="drawer-header-actions">
+        <button class="drawer-action-btn" id="drawerHistoryBtn" title="历史辅导记录">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+        <button class="drawer-action-btn" id="drawerCloseBtn" title="收起抽屉">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 对话消息滚屏区 -->
+    <div class="drawer-messages" id="drawerChatHistory">
+      <!-- 消息 1 -->
+      <div class="message received">
+        <div class="msg-avatar-wrapper">
+          <img src="cx_study_pet.jpg" class="msg-pet-avatar">
+        </div>
+        <div class="msg-content-wrapper">
+          <div class="msg-bubble">
+            哈喽！我是你的 3D 伴学萌宠 **CX-Agent**！😸
+            <br><br>
+            我已经与你的今日学习状态同步了！如果你遇到不懂的物理推导，可以随时点击下方的 **📎** 按钮上传题目截图或课件，或者按住 **🎙️** 发送语音消息向我提问哦！
+          </div>
+          <span class="msg-time">下午 3:30</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷芯片推荐 -->
+    <div class="drawer-chips-wrapper">
+      <div class="drawer-chip" data-text="如何高效完成今天的物理任务？">如何完成今日任务？</div>
+      <div class="drawer-chip" data-text="化学同分异构体知识总结卡？">化学同分异构卡</div>
+      <div class="drawer-chip" data-text="学习有点累了，求鼓励！">求鼓励！</div>
+    </div>
+
+    <!-- 今日任务 Selector -->
+    <div class="drawer-context-bar">
+      <span style="font-size: 10.5px; color: var(--text-secondary); white-space: nowrap;">🎯 关联任务:</span>
+      <select id="drawerContextSelect">
+        <option value="physics" selected>物理：牛顿运动定律情境分析 [进行中]</option>
+        <option value="math">数学：高二衔接函数综合练习 [已完成]</option>
+        <option value="chemistry">化学：有机化学基础同分异构体 [已完成]</option>
+        <option value="none">-- 自由提问 --</option>
+      </select>
+    </div>
+
+    <!-- 上传预览滑出条 -->
+    <div class="upload-preview-container" id="drawerUploadPreview" style="display: none; padding: 6px 16px; background: rgba(10, 15, 28, 0.9); border-top: 1px solid rgba(255,255,255,0.05);">
+      <div class="upload-preview-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 4px 8px; display: flex; align-items: center; gap: 8px; font-size: 11px; width: 100%;">
+        <div class="upload-preview-icon-wrapper" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+          <img src="" class="upload-preview-thumb" id="drawerPreviewThumb" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover; display: none;">
+          <div id="drawerPreviewFileIcon" style="display: none; width: 24px; height: 24px; align-items: center; justify-content: center;"></div>
+        </div>
+        <span class="upload-preview-name" id="drawerPreviewName" style="color: #fff; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+        <div class="upload-preview-remove" id="drawerPreviewRemove" style="color: var(--chemistry-coral); cursor: pointer; font-size: 14px; font-weight: 700;">×</div>
+      </div>
+    </div>
+
+    <!-- 底部输入框 -->
+    <div class="drawer-input-container">
+      <button class="input-action-btn" id="drawerAttachBtn" title="上传截图/文档">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+      <input type="text" class="drawer-input" id="drawerChatInput" placeholder="关联任务提问，或发送语音/图片..." autocomplete="off">
+      <button class="input-action-btn" id="drawerVoiceBtn" title="按住语音">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      </button>
+      <button class="drawer-send-btn" id="drawerSendBtn" title="发送">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+
+    <!-- 历史会话遮罩抽屉 -->
+    <div class="mobile-history-overlay" id="mobileHistoryOverlay">
+      <div class="history-header">
+        <button class="back-chat-btn" id="mobileBackChatBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h3>历史辅导记录</h3>
+      </div>
+      <div class="history-list" id="mobileHistoryList"></div>
+    </div>
+
+    <!-- Loading & Toast -->
+    <div class="drawer-loading" id="drawerLoading">
+      <div class="spinner"></div>
+      <div style="font-size: 11.5px; color: var(--physics-mint); font-weight: 600;">正在加载历史会话...</div>
+    </div>
+    <div class="drawer-toast" id="drawerToast">已成功加载会话</div>
+
+  </div>
+
+
+  <script>
+    // ===================================================
+    // THREE.JS 3D WebGL 移动端悬浮挂件渲染
+    // ===================================================
+    let scene, camera, renderer;
+    let robotGroup, head, body, leftEar, rightEar, leftEye, rightEye, leftBlush, rightBlush, baseRing, badge;
+    let leftEarCollider, rightEarCollider; 
+    let baseRingMaterial, blushMaterial, badgeMaterial, badgeLight;
+    let mouse = { x: 0, y: 0 };
+    let jumpTime = 0;
+    let is3dJumping = false;
+    let isHovered = false;
+
+    let earTwitchTimer = 0;
+    let headNudgeTimer = 0; 
+    let baseRingTargetSpin = 0.015;
+    let baseRingCurrentSpin = 0.015;
+    let badgeTargetScale = 1.0;
+    let badgeCurrentScale = 1.0;
+    let badgeLightTargetIntensity = 0.0;
+    let badgeLightCurrentIntensity = 0.0;
+    let hoverTime = 0;
+    let petAvatarDataUrl = "";
+
+    const webglContainer = document.getElementById("webglContainer");
+    const mobilePetWidget = document.getElementById("mobilePetWidget");
+    const mobileSpeechBubble = document.getElementById("mobileSpeechBubble");
+    const mobileChatDrawer = document.getElementById("mobileChatDrawer");
+    const drawerBackdrop = document.getElementById("drawerBackdrop");
+    const drawerCloseBtn = document.getElementById("drawerCloseBtn");
+
+    function init3D() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+      camera.position.set(0, 0, 5.0); 
+
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(95, 95);
+      renderer.shadowMap.enabled = true;
+      webglContainer.appendChild(renderer.domElement);
+
+      robotGroup = new THREE.Group();
+      scene.add(robotGroup);
+
+      const porcelainMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff, roughness: 0.12, metalness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.08
+      });
+      const screenMaterial = new THREE.MeshStandardMaterial({
+        color: 0x070913, roughness: 0.08, metalness: 0.95
+      });
+      const eyeGlowMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2dd4bf, emissive: 0x2dd4bf, emissiveIntensity: 2.0
+      });
+      blushMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff5d9e, emissive: 0xff5d9e, emissiveIntensity: 1.5
+      });
+      badgeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2dd4bf, emissive: 0x2dd4bf, emissiveIntensity: 2.5
+      });
+      baseRingMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8c70ed, emissive: 0x8c70ed, emissiveIntensity: 1.8
+      });
+
+      // 头部 (半径 0.75)
+      head = new THREE.Mesh(new THREE.SphereGeometry(0.75, 32, 32), porcelainMaterial);
+      head.position.y = 0.2;
+      robotGroup.add(head);
+
+      const screenGeom = new THREE.SphereGeometry(
+        0.756, 32, 32,
+        Math.PI / 2 - Math.PI / 3, Math.PI * 2 / 3, 
+        Math.PI / 4 + 0.05, Math.PI / 2.1            
+      );
+      const screen = new THREE.Mesh(screenGeom, screenMaterial);
+      head.add(screen);
+
+      leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), eyeGlowMaterial);
+      leftEye.scale.set(1, 1.25, 0.5);
+      leftEye.position.set(-0.24, 0.08, 0.71);
+      head.add(leftEye);
+
+      rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), eyeGlowMaterial);
+      rightEye.scale.set(1, 1.25, 0.5);
+      rightEye.position.set(0.24, 0.08, 0.71);
+      head.add(rightEye);
+
+      const mouthGeom = new THREE.TorusGeometry(0.038, 0.012, 8, 16, Math.PI);
+      const leftMouth = new THREE.Mesh(mouthGeom, eyeGlowMaterial);
+      leftMouth.rotation.set(0, 0, Math.PI);
+      leftMouth.position.set(-0.035, -0.07, 0.725);
+      head.add(leftMouth);
+
+      const rightMouth = new THREE.Mesh(mouthGeom, eyeGlowMaterial);
+      rightMouth.rotation.set(0, 0, Math.PI);
+      rightMouth.position.set(0.035, -0.07, 0.725);
+      head.add(rightMouth);
+
+      leftBlush = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), blushMaterial);
+      leftBlush.scale.set(1.6, 0.8, 0.5);
+      leftBlush.position.set(-0.36, -0.1, 0.66);
+      head.add(leftBlush);
+
+      rightBlush = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), blushMaterial);
+      rightBlush.scale.set(1.6, 0.8, 0.5);
+      rightBlush.position.set(0.36, -0.1, 0.66);
+      head.add(rightBlush);
+
+      const earGeom = new THREE.ConeGeometry(0.18, 0.35, 4);
+      leftEar = new THREE.Mesh(earGeom, porcelainMaterial);
+      leftEar.position.set(-0.45, 0.6, -0.1);
+      leftEar.rotation.set(0.2, 0.0, 0.45); 
+      head.add(leftEar);
+
+      rightEar = new THREE.Mesh(earGeom, porcelainMaterial);
+      rightEar.position.set(0.45, 0.6, -0.1);
+      rightEar.rotation.set(0.2, 0.0, -0.45);
+      head.add(rightEar);
+
+      const colliderGeom = new THREE.SphereGeometry(0.24, 8, 8);
+      const colliderMat = new THREE.MeshBasicMaterial({ visible: false }); 
+      leftEarCollider = new THREE.Mesh(colliderGeom, colliderMat);
+      leftEarCollider.position.set(-0.45, 0.6, -0.1);
+      head.add(leftEarCollider);
+
+      rightEarCollider = new THREE.Mesh(colliderGeom, colliderMat);
+      rightEarCollider.position.set(0.45, 0.6, -0.1);
+      head.add(rightEarCollider);
+
+      body = new THREE.Mesh(new THREE.SphereGeometry(0.58, 32, 32), porcelainMaterial);
+      body.scale.set(1.0, 1.2, 1.0);
+      body.position.y = -0.65;
+      robotGroup.add(body);
+
+      badge = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 16), badgeMaterial);
+      badge.position.set(0, 0.12, 0.615);
+      body.add(badge);
+
+      const armGeom = new THREE.SphereGeometry(0.11, 16, 16);
+      const leftArm = new THREE.Mesh(armGeom, porcelainMaterial);
+      leftArm.position.set(-0.68, -0.5, 0.15);
+      robotGroup.add(leftArm);
+
+      const rightArm = new THREE.Mesh(armGeom, porcelainMaterial);
+      rightArm.position.set(0.68, -0.5, 0.15);
+      robotGroup.add(rightArm);
+
+      const torusGeom = new THREE.TorusGeometry(0.9, 0.04, 8, 48);
+      baseRing = new THREE.Mesh(torusGeom, baseRingMaterial);
+      baseRing.rotation.x = Math.PI / 2;
+      baseRing.position.y = -1.35;
+      robotGroup.add(baseRing);
+
+      const nodeGeom = new THREE.BoxGeometry(0.12, 0.06, 0.12);
+      for (let i = 0; i < 3; i++) {
+        const angle = (i * Math.PI * 2) / 3;
+        const node = new THREE.Mesh(nodeGeom, eyeGlowMaterial);
+        node.position.set(Math.cos(angle) * 0.9, Math.sin(angle) * 0.9, 0);
+        baseRing.add(node);
+      }
+
+      const ambientLight = new THREE.AmbientLight(0x0e172e, 1.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+      dirLight.position.set(2, 5, 4);
+      scene.add(dirLight);
+
+      const faceLight = new THREE.PointLight(0xffffff, 1.5, 4);
+      faceLight.position.set(0, 0.5, 1.5);
+      scene.add(faceLight);
+
+      badgeLight = new THREE.PointLight(0x2dd4bf, 0.0, 2.2); 
+      badgeLight.position.set(0, -0.5, 1.0);
+      scene.add(badgeLight);
+
+      const cyanLight = new THREE.PointLight(0x2dd4bf, 2.5, 6);
+      cyanLight.position.set(-2.5, -0.5, 1.5);
+      scene.add(cyanLight);
+
+      const purpleLight = new THREE.PointLight(0x8c70ed, 2.5, 6);
+      purpleLight.position.set(2.5, -1.5, 1.5);
+      scene.add(purpleLight);
+
+      animate3D();
+
+      // 对焦快照
+      setTimeout(() => {
+        try {
+          const originalPosition = camera.position.clone();
+          camera.position.set(0, -0.2, 4.4); 
+          camera.lookAt(0, -0.2, 0);
+          renderer.render(scene, camera);
+          
+          petAvatarDataUrl = renderer.domElement.toDataURL("image/png");
+          
+          camera.position.copy(originalPosition);
+          camera.lookAt(new THREE.Vector3(0,0,0));
+          renderer.render(scene, camera);
+
+          const drawerHeaderAvatar = document.getElementById("drawerHeaderAvatar");
+          if (drawerHeaderAvatar) drawerHeaderAvatar.src = petAvatarDataUrl;
+          
+          const msgAvatars = document.querySelectorAll(".msg-pet-avatar");
+          msgAvatars.forEach(img => { img.src = petAvatarDataUrl; });
+        } catch (e) {
+          console.error("Mobile avatar snapshot failed:", e);
+        }
+      }, 150);
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      const time = Date.now() * 0.0015;
+
+      if (!is3dJumping) {
+        currentY = Math.sin(time * 1.5) * 0.12;
+        robotGroup.position.y = currentY;
+      } else {
+        jumpTime += 0.05;
+        if (jumpTime >= Math.PI) {
+          is3dJumping = false;
+          robotGroup.position.y = currentY;
+        } else {
+          robotGroup.position.y = currentY + Math.sin(jumpTime) * 1.3;
+          robotGroup.rotation.x = jumpTime * 2;
+        }
+      }
+
+      const targetHeadRotY = mouse.x * 0.45;
+      const targetHeadRotX = -mouse.y * 0.3;
+      
+      if (headNudgeTimer <= 0) {
+        head.rotation.y += (targetHeadRotY - head.rotation.y) * 0.12;
+        head.rotation.x += (targetHeadRotX - head.rotation.x) * 0.12;
+        head.rotation.z += (0 - head.rotation.z) * 0.1;
+      }
+      body.rotation.y += (targetHeadRotY * 0.25 - body.rotation.y) * 0.1;
+
+      let eyeScaleX = 1.0;
+      let eyeScaleY = 1.25;
+
+      if (isHovered) {
+        hoverTime += 0.016;
+        if (hoverTime < 0.6) {
+          const winkPhase = Math.sin(hoverTime * Math.PI * 2 / 0.3);
+          if (winkPhase < 0) eyeScaleY = 0.08;
+        } else {
+          eyeScaleX = 1.25 + Math.sin(time * 10) * 0.06;
+          eyeScaleY = 1.25 + Math.sin(time * 10) * 0.06;
+        }
+        blushMaterial.emissiveIntensity = 3.2; 
+        leftEar.rotation.z += (1.0 - leftEar.rotation.z) * 0.15;
+        rightEar.rotation.z += (-1.0 - rightEar.rotation.z) * 0.15;
+      } else {
+        hoverTime = 0;
+        blushMaterial.emissiveIntensity = 1.5;
+        leftEar.rotation.z += (0.45 - leftEar.rotation.z) * 0.12;
+        rightEar.rotation.z += (-0.45 - rightEar.rotation.z) * 0.12;
+      }
+
+      if (earTwitchTimer > 0) {
+        earTwitchTimer -= 0.016;
+        const violentTwitch = Math.sin(Date.now() * 0.09) * 0.28;
+        leftEar.rotation.z = (isHovered ? 1.0 : 0.45) + violentTwitch;
+        rightEar.rotation.z = (isHovered ? -1.0 : -0.45) - violentTwitch;
+      }
+
+      if (headNudgeTimer > 0) {
+        headNudgeTimer -= 0.016;
+        head.rotation.z = Math.sin(headNudgeTimer * Math.PI * 4.0) * 0.24;
+        head.rotation.x = Math.abs(Math.sin(headNudgeTimer * Math.PI * 2.0)) * 0.12; 
+      }
+
+      let finalEyeScaleY = eyeScaleY;
+      if (!isHovered) {
+        const naturalBlinkCycle = time % 4;
+        if (naturalBlinkCycle > 3.8) finalEyeScaleY = 0.08;
+      }
+      leftEye.scale.set(eyeScaleX, finalEyeScaleY, 0.5);
+      rightEye.scale.set(eyeScaleX, finalEyeScaleY, 0.5);
+
+      baseRingCurrentSpin += (baseRingTargetSpin - baseRingCurrentSpin) * 0.08;
+      baseRing.rotation.z -= baseRingCurrentSpin;
+      if (baseRingTargetSpin > 0.015) baseRingTargetSpin -= 0.003;
+
+      badgeCurrentScale += (badgeTargetScale - badgeCurrentScale) * 0.12;
+      badge.scale.set(badgeCurrentScale, badgeCurrentScale, badgeCurrentScale * 0.45);
+      if (badgeTargetScale > 1.0) {
+        badgeMaterial.color.setHex(0xffffff); 
+        badgeMaterial.emissive.setHex(0xffffff);
+        badgeMaterial.emissiveIntensity = 8.0;
+        badgeTargetScale -= 0.035; 
+      } else {
+        badgeMaterial.color.setHex(0x2dd4bf);
+        badgeMaterial.emissive.setHex(0x2dd4bf);
+        badgeMaterial.emissiveIntensity = 2.5;
+      }
+
+      badgeLightCurrentIntensity += (badgeLightTargetIntensity - badgeLightCurrentIntensity) * 0.12;
+      badgeLight.intensity = badgeLightCurrentIntensity;
+      if (badgeLightTargetIntensity > 0.0) badgeLightTargetIntensity -= 0.15;
+
+      baseRing.position.y = -1.35 + Math.sin(time * 1.5 - 0.5) * 0.07;
+      baseRingMaterial.emissiveIntensity = (1.6 + Math.sin(time * 3.5) * 0.4) * (baseRingCurrentSpin * 20.0);
+
+      if (!is3dJumping) {
+        robotGroup.rotation.x += (0 - robotGroup.rotation.x) * 0.1;
+        robotGroup.rotation.y += (0 - robotGroup.rotation.y) * 0.1;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+
+    // ===================================================
+    // 移动端悬浮挂件与抽屉滑出交互
+    // ===================================================
+    const raycaster = new THREE.Raycaster();
+    const mouse3d = new THREE.Vector2();
+
+    // 点击/触摸悬浮挂件展开 AI 对话抽屉
+    mobilePetWidget.addEventListener("touchstart", (e) => {
+      isHovered = true;
+      const touch = e.touches[0];
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse3d.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse3d.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse3d, camera);
+      const intersects = raycaster.intersectObjects(robotGroup.children, true);
+
+      if (intersects.length > 0) {
+        let hitObj = intersects[0].object;
+        if (hitObj.parent === baseRing) hitObj = baseRing;
+
+        if (hitObj === leftEar || hitObj === rightEar || hitObj === leftEarCollider || hitObj === rightEarCollider) {
+          earTwitchTimer = 1.2;
+          triggerSpeechBubble(["喵呜～捏捏猫耳，精力拉满！😸"]);
+        } else if (hitObj === head) {
+          headNudgeTimer = 1.0;
+          triggerSpeechBubble(["摸摸猫头，专注度爆发！✨"]);
+        } else if (hitObj === badge) {
+          badgeTargetScale = 1.8;
+          badgeLightTargetIntensity = 5.0;
+          triggerSpeechBubble(["CX 核心充能 100%！⚡"]);
+        } else if (hitObj === baseRing) {
+          baseRingTargetSpin = 0.25;
+          triggerSpeechBubble(["反重力发动机超载！🚀"]);
+        } else {
+          trigger3dJump();
+          for (let i = 0; i < 3; i++) spawnHeart();
+        }
+      } else {
+        trigger3dJump();
+        for (let i = 0; i < 3; i++) spawnHeart();
+      }
+
+      // 打开抽屉
+      openChatDrawer();
+    });
+
+    mobilePetWidget.addEventListener("click", () => {
+      openChatDrawer();
+    });
+
+    mobilePetWidget.addEventListener("touchend", () => {
+      isHovered = false;
+    });
+
+    function openChatDrawer() {
+      mobileChatDrawer.classList.add("is-open");
+      drawerBackdrop.classList.add("is-visible");
+      mobilePetWidget.classList.add("drawer-open");
+    }
+
+    function closeChatDrawer() {
+      mobileChatDrawer.classList.remove("is-open");
+      drawerBackdrop.classList.remove("is-visible");
+      mobilePetWidget.classList.remove("drawer-open");
+    }
+
+    drawerCloseBtn.addEventListener("click", closeChatDrawer);
+    drawerBackdrop.addEventListener("click", closeChatDrawer);
+    document.getElementById("drawerHandleBar").addEventListener("click", closeChatDrawer);
+
+    function trigger3dJump() {
+      if (is3dJumping) return;
+      is3dJumping = true;
+      jumpTime = 0;
+    }
+
+    let speechTimer = null;
+    function triggerSpeechBubble(speechList) {
+      if (speechTimer) clearTimeout(speechTimer);
+      const text = speechList[Math.floor(Math.random() * speechList.length)];
+      mobileSpeechBubble.textContent = text;
+      mobileSpeechBubble.classList.add("is-visible");
+      
+      speechTimer = setTimeout(() => {
+        mobileSpeechBubble.classList.remove("is-visible");
+      }, 4000);
+    }
+
+    function spawnHeart() {
+      const heart = document.createElement("div");
+      heart.className = "floating-heart";
+      heart.innerHTML = "♥";
+
+      const startX = Math.random() * 40 + 25;
+      const dx = (Math.random() - 0.5) * 60;
+      const duration = 0.8 + Math.random() * 0.5;
+
+      heart.style.left = `${startX}px`;
+      heart.style.bottom = "30px";
+      heart.style.setProperty("--dx", `${dx}px`);
+      heart.style.setProperty("--duration", `${duration}s`);
+
+      mobilePetWidget.appendChild(heart);
+      setTimeout(() => heart.remove(), duration * 1000);
+    }
+
+
+    // ==========================================
+    // 多模态聊天输入与文件上传
+    // ==========================================
+    function parseMarkdown(text) {
+      let html = text;
+      html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/`(.*?)`/g, "<code>$1</code>");
+      return html;
+    }
+
+    function getFileIcon(fileName) {
+      const ext = fileName.split('.').pop().toLowerCase();
+      if (ext === 'pdf') {
+        return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="var(--chemistry-coral)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>`;
+      }
+      if (['doc', 'docx'].includes(ext)) {
+        return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="var(--math-blue)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M11.5 15h3M11.5 12h3"/></svg>`;
+      }
+      if (['zip', 'rar', '7z'].includes(ext)) {
+        return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="var(--english-purple)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="12" cy="14" r="2"/></svg>`;
+      }
+      return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+    }
+
+    let uploadedFileUrl = "";
+    let uploadedFileName = "";
+    let uploadedFileSizeStr = "";
+
+    const drawerAttachBtn = document.getElementById("drawerAttachBtn");
+    const drawerChatInput = document.getElementById("drawerChatInput");
+    const drawerVoiceBtn = document.getElementById("drawerVoiceBtn");
+    const drawerSendBtn = document.getElementById("drawerSendBtn");
+    const drawerChatHistory = document.getElementById("drawerChatHistory");
+    const drawerContextSelect = document.getElementById("drawerContextSelect");
+
+    const drawerFileInput = document.createElement("input");
+    drawerFileInput.type = "file";
+    drawerFileInput.style.display = "none";
+    document.body.appendChild(drawerFileInput);
+
+    drawerAttachBtn.addEventListener("click", () => drawerFileInput.click());
+
+    drawerFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+      uploadedFileName = file.name;
+
+      const sizeKB = Math.round(file.size / 1024);
+      uploadedFileSizeStr = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + " MB" : sizeKB + " KB";
+
+      const drawerPreviewThumb = document.getElementById("drawerPreviewThumb");
+      const drawerPreviewFileIcon = document.getElementById("drawerPreviewFileIcon");
+      const drawerUploadPreview = document.getElementById("drawerUploadPreview");
+      const drawerPreviewName = document.getElementById("drawerPreviewName");
+
+      if (isImg) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          uploadedFileUrl = evt.target.result;
+          drawerPreviewThumb.src = uploadedFileUrl;
+          drawerPreviewThumb.style.display = "block";
+          drawerPreviewFileIcon.style.display = "none";
+          drawerPreviewName.textContent = uploadedFileName + ` (${uploadedFileSizeStr})`;
+          drawerUploadPreview.style.display = "flex";
+        };
+        reader.readAsDataURL(file);
+      } else {
+        uploadedFileUrl = "blob_document";
+        drawerPreviewThumb.style.display = "none";
+        drawerPreviewFileIcon.style.display = "flex";
+        drawerPreviewFileIcon.innerHTML = getFileIcon(uploadedFileName);
+        drawerPreviewName.textContent = uploadedFileName + ` (${uploadedFileSizeStr})`;
+        drawerUploadPreview.style.display = "flex";
+      }
+    });
+
+    document.getElementById("drawerPreviewRemove").addEventListener("click", clearUpload);
+
+    function clearUpload() {
+      uploadedFileUrl = "";
+      uploadedFileName = "";
+      uploadedFileSizeStr = "";
+      drawerFileInput.value = "";
+      document.getElementById("drawerUploadPreview").style.display = "none";
+    }
+
+    function appendMessage(text, type) {
+      const now = new Date();
+      const timeStr = `下午 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `message ${type}`;
+
+      if (type === "received") {
+        const avatarWrapper = document.createElement("div");
+        avatarWrapper.className = "msg-avatar-wrapper";
+        avatarWrapper.innerHTML = `<img src="${petAvatarDataUrl || 'cx_study_pet.jpg'}" class="msg-pet-avatar">`;
+        messageDiv.appendChild(avatarWrapper);
+      }
+
+      const contentWrapper = document.createElement("div");
+      contentWrapper.className = "msg-content-wrapper";
+
+      const bubbleDiv = document.createElement("div");
+      bubbleDiv.className = "msg-bubble";
+      bubbleDiv.innerHTML = parseMarkdown(text);
+
+      const timeSpan = document.createElement("span");
+      timeSpan.className = "msg-time";
+      timeSpan.textContent = timeStr;
+
+      contentWrapper.appendChild(bubbleDiv);
+      contentWrapper.appendChild(timeSpan);
+      messageDiv.appendChild(contentWrapper);
+      drawerChatHistory.appendChild(messageDiv);
+
+      drawerChatHistory.scrollTo({ top: drawerChatHistory.scrollHeight, behavior: "smooth" });
+
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise([messageDiv]).catch((err) => console.error("MathJax render error:", err));
+      }
+    }
+
+    function showTypingIndicator() {
+      const wrapperDiv = document.createElement("div");
+      wrapperDiv.className = "typing-wrapper";
+      wrapperDiv.id = "drawerTypingWrapper";
+      wrapperDiv.style.cssText = "display: flex; gap: 10px; align-self: flex-start; margin-top: 4px;";
+
+      const avatarWrapper = document.createElement("div");
+      avatarWrapper.className = "msg-avatar-wrapper";
+      avatarWrapper.innerHTML = `<img src="${petAvatarDataUrl || 'cx_study_pet.jpg'}" class="msg-pet-avatar">`;
+
+      const indicator = document.createElement("div");
+      indicator.style.cssText = "display: flex; gap: 5px; padding: 12px 16px; background: rgba(22, 33, 56, 0.45); border-left: 3px solid var(--physics-mint); border-radius: 16px; border-top-left-radius: 4px;";
+      indicator.innerHTML = `<span style="width:5px; height:5px; background:var(--physics-mint); border-radius:50%;"></span><span style="width:5px; height:5px; background:var(--physics-mint); border-radius:50%;"></span><span style="width:5px; height:5px; background:var(--physics-mint); border-radius:50%;"></span>`;
+
+      wrapperDiv.appendChild(avatarWrapper);
+      wrapperDiv.appendChild(indicator);
+      drawerChatHistory.appendChild(wrapperDiv);
+      drawerChatHistory.scrollTo({ top: drawerChatHistory.scrollHeight, behavior: "smooth" });
+    }
+
+    function removeTypingIndicator() {
+      const wrapper = document.getElementById("drawerTypingWrapper");
+      if (wrapper) wrapper.remove();
+    }
+
+    function handleSend(text) {
+      if (!text.trim() && !uploadedFileUrl) return;
+
+      const now = new Date();
+      const timeStr = `下午 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      if (uploadedFileUrl) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "message sent";
+
+        const contentWrapper = document.createElement("div");
+        contentWrapper.className = "msg-content-wrapper";
+
+        const bubbleDiv = document.createElement("div");
+        bubbleDiv.className = "msg-bubble image-attachment-bubble";
+
+        let attachmentHtml = "";
+        const ext = uploadedFileName.split('.').pop().toLowerCase();
+        const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+
+        if (isImg) {
+          attachmentHtml = `
+            <div class="attachment-preview">
+              <div class="image-placeholder tex2jax_ignore" style="padding:8px; text-align:center;">
+                <img src="${uploadedFileUrl}" style="width: 100%; height: auto; max-height: 140px; object-fit: contain; border-radius: 6px;">
+              </div>
+              <div class="attachment-info">
+                <span class="file-name">${uploadedFileName}</span>
+                <span class="file-size">${uploadedFileSizeStr}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          attachmentHtml = `
+            <div class="attachment-preview non-image">
+              <div class="file-download-card">
+                <div class="file-icon-box">
+                  ${getFileIcon(uploadedFileName)}
+                </div>
+                <div class="file-text-box">
+                  <span class="file-name" title="${uploadedFileName}">${uploadedFileName}</span>
+                  <span class="file-size">${uploadedFileSizeStr}</span>
+                </div>
+                <div class="file-download-action">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        if (text.trim()) attachmentHtml += `<div style="font-size:12.5px; padding:2px 4px;">${parseMarkdown(text)}</div>`;
+
+        bubbleDiv.innerHTML = attachmentHtml;
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "msg-time";
+        timeSpan.textContent = timeStr;
+
+        contentWrapper.appendChild(bubbleDiv);
+        contentWrapper.appendChild(timeSpan);
+        messageDiv.appendChild(contentWrapper);
+        drawerChatHistory.appendChild(messageDiv);
+
+        const sentName = uploadedFileName;
+        const sentSize = uploadedFileSizeStr;
+
+        clearUpload();
+        drawerChatInput.value = "";
+        drawerChatHistory.scrollTo({ top: drawerChatHistory.scrollHeight, behavior: "smooth" });
+
+        showTypingIndicator();
+        setTimeout(() => {
+          removeTypingIndicator();
+          let reply = "";
+          if (isImg) {
+            reply = `我看清了你刚才上传的文件！这个图形是高二物理典型的**斜面体滑块受力模型**。
+            <br><br>
+            根据受力平衡方程：
+            <div class="math-block">\(F_N = mg \\cos\\theta\)</div>
+            
+            你可以使用这个公式来求滑动摩擦力：
+            <div class="math-block">\(f = \\mu F_N = \\mu mg \\cos\\theta\)</div>
+            代入数值计算即可完成打卡！🌟`;
+          } else {
+            reply = `我已接收到你上传的学习文档 **${sentName}** (\(${sentSize}\))！
+            <br><br>
+            我分析了这篇文档的提纲，发现它与你当前正在进行的物理任务 <code>牛顿运动定律情境分析</code> 非常契合。我已经将它们关联起来了！
+            <br><br>
+            请问关于这篇复习资料中的任何物理定理，需要我为你解答吗？`;
+          }
+          appendMessage(reply, "received");
+        }, 1500);
+      } else {
+        appendMessage(text, "sent");
+        drawerChatInput.value = "";
+
+        showTypingIndicator();
+        setTimeout(() => {
+          removeTypingIndicator();
+          let reply = simulatedReplies[text] || simulatedReplies["default"];
+          appendMessage(reply, "received");
+        }, 1200);
+      }
+    }
+
+    drawerSendBtn.addEventListener("click", () => handleSend(drawerChatInput.value));
+    drawerChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleSend(drawerChatInput.value);
+    });
+
+    document.querySelectorAll(".drawer-chip").forEach(chip => {
+      chip.addEventListener("click", () => handleSend(chip.dataset.text));
+    });
+
+    // 麦克风录音
+    let voiceActive = false;
+    drawerVoiceBtn.addEventListener("click", () => {
+      voiceActive = !voiceActive;
+      if (voiceActive) {
+        drawerVoiceBtn.style.color = "var(--chemistry-coral)";
+        drawerChatInput.placeholder = "🎙️ 正在录音...再次点击停止";
+      } else {
+        drawerVoiceBtn.style.color = "";
+        drawerChatInput.placeholder = "关联任务提问，或发送语音/图片...";
+        
+        appendMessage("🎙️ [语音消息 0:05\"]", "sent");
+        showTypingIndicator();
+        setTimeout(() => {
+          removeTypingIndicator();
+          appendMessage(simulatedReplies["default"], "received");
+        }, 1200);
+      }
+    });
+
+    // 历史记录引擎
+    const drawerHistoryBtn = document.getElementById("drawerHistoryBtn");
+    const mobileHistoryOverlay = document.getElementById("mobileHistoryOverlay");
+    const mobileBackChatBtn = document.getElementById("mobileBackChatBtn");
+    const mobileHistoryList = document.getElementById("mobileHistoryList");
+    const drawerLoading = document.getElementById("drawerLoading");
+    const drawerToast = document.getElementById("drawerToast");
+
+    let currentSessionId = "physics";
+
+    let historySessions = [
+      {
+        id: "physics",
+        title: "物理：斜面体与摩擦力分析",
+        date: "今天",
+        tag: "物理",
+        tagClass: "physics",
+        preview: "在有摩擦的情境下，你漏掉了沿着斜面向上...",
+        messages: ""
+      },
+      {
+        id: "math",
+        title: "数学：导数切线方程求解",
+        date: "昨天",
+        tag: "数学",
+        tagClass: "math",
+        preview: "你的斜率计算 k = -1 确实是正确的！",
+        messages: `
+        <div class="message received">
+          <div class="msg-avatar-wrapper"><img src="cx_study_pet.jpg" class="msg-pet-avatar"></div>
+          <div class="msg-content-wrapper">
+            <div class="msg-bubble">哈喽！今天我们要一起攻克**数学：函数与导数综合练习**中的切线问题吗？📐</div>
+            <span class="msg-time">周一 10:15</span>
+          </div>
+        </div>
+        <div class="message sent">
+          <div class="msg-content-wrapper">
+            <div class="msg-bubble">求曲线 \(y = x^3 - 2x^2 + 3\) 在点 \((1, 2)\) 处的切线斜率，我算出来是 \(-1\)，对吗？</div>
+            <span class="msg-time">周一 10:17</span>
+          </div>
+        </div>
+        <div class="message received">
+          <div class="msg-avatar-wrapper"><img src="cx_study_pet.jpg" class="msg-pet-avatar"></div>
+          <div class="msg-content-wrapper">
+            <div class="msg-bubble">
+              对曲线求导得到 \(y' = 3x^2 - 4x\)。代入 \(x = 1\) 得到切线斜率 \(k = -1\)。
+              <br><br>
+              计算结果非常准确！切线方程为 \(x + y - 3 = 0\)。💯
+            </div>
+            <span class="msg-time">周一 10:18</span>
+          </div>
+        </div>
+        `
+      }
+    ];
+
+    historySessions[0].messages = drawerChatHistory.innerHTML;
+
+    drawerHistoryBtn.addEventListener("click", () => {
+      renderHistoryList();
+      mobileHistoryOverlay.classList.add("is-open");
+    });
+
+    mobileBackChatBtn.addEventListener("click", () => {
+      mobileHistoryOverlay.classList.remove("is-open");
+    });
+
+    function renderHistoryList() {
+      mobileHistoryList.innerHTML = "";
+      historySessions.forEach(session => {
+        const item = document.createElement("div");
+        item.className = `history-item ${session.tagClass} ${session.id === currentSessionId ? 'active' : ''}`;
+        item.innerHTML = `
+          <div class="history-item-top">
+            <span class="history-item-title">${session.title}</span>
+            <span class="history-item-date">${session.date}</span>
+          </div>
+          <div class="history-item-preview">${session.preview}</div>
+        `;
+        item.addEventListener("click", () => {
+          if (session.id === currentSessionId) {
+            mobileHistoryOverlay.classList.remove("is-open");
+            return;
+          }
+          loadSession(session.id);
+        });
+        mobileHistoryList.appendChild(item);
+      });
+    }
+
+    function loadSession(id) {
+      drawerLoading.style.display = "flex";
+      currentSessionId = id;
+
+      setTimeout(() => {
+        const target = historySessions.find(s => s.id === id);
+        drawerChatHistory.innerHTML = target.messages;
+
+        if (petAvatarDataUrl) {
+          document.querySelectorAll(".msg-pet-avatar").forEach(img => { img.src = petAvatarDataUrl; });
+        }
+
+        drawerLoading.style.display = "none";
+        mobileHistoryOverlay.classList.remove("is-open");
+        showToast(`已加载 - ${target.title}`);
+        drawerChatHistory.scrollTo({ top: drawerChatHistory.scrollHeight });
+
+        parseAllExistingBubbles();
+
+        if (id === "physics") drawerContextSelect.value = "physics";
+        else if (id === "math") drawerContextSelect.value = "math";
+        else drawerContextSelect.value = "none";
+
+      }, 1000);
+    }
+
+    let toastTimer = null;
+    function showToast(text) {
+      if (toastTimer) clearTimeout(toastTimer);
+      drawerToast.textContent = text;
+      drawerToast.classList.add("is-show");
+      toastTimer = setTimeout(() => drawerToast.classList.remove("is-show"), 2500);
+    }
+
+    function parseAllExistingBubbles() {
+      document.querySelectorAll("#drawerChatHistory .msg-bubble").forEach(bubble => {
+        const hasSvg = bubble.querySelector("svg");
+        const hasTable = bubble.querySelector(".chat-data-table");
+        const hasMath = bubble.querySelector(".math-block");
+
+        if (hasSvg || hasTable || hasMath) {
+          let rawHtml = bubble.innerHTML;
+          let tableHtml = hasTable ? hasTable.outerHTML : "";
+          let svgHtml = hasSvg ? bubble.querySelector(".attachment-preview").outerHTML : "";
+          let mathBlocks = Array.from(bubble.querySelectorAll(".math-block")).map(block => block.outerHTML);
+
+          if (hasTable) rawHtml = rawHtml.replace(tableHtml, "<!-- TABLE_PLACEHOLDER -->");
+          if (hasSvg) rawHtml = rawHtml.replace(svgHtml, "<!-- SVG_PLACEHOLDER -->");
+          mathBlocks.forEach((mHtml, i) => { rawHtml = rawHtml.replace(mHtml, `<!-- MATH_PLACEHOLDER_${i} -->`); });
+
+          let formatted = parseMarkdown(rawHtml);
+          if (hasTable) formatted = formatted.replace("<!-- TABLE_PLACEHOLDER -->", tableHtml);
+          if (hasSvg) formatted = formatted.replace("<!-- SVG_PLACEHOLDER -->", svgHtml);
+          mathBlocks.forEach((mHtml, i) => { formatted = formatted.replace(`<!-- MATH_PLACEHOLDER_${i} -->`, mHtml); });
+
+          bubble.innerHTML = formatted;
+        } else {
+          bubble.innerHTML = parseMarkdown(bubble.innerHTML);
+        }
+      });
+
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise().catch((err) => console.error("MathJax err:", err));
+      }
+    }
+
+    const simulatedReplies = {
+      "如何高效完成今天的物理任务？": `物理任务要求你探究**斜面体动力学模型**。📘
+<br><br>
+建议：
+1. 专注计时中请勿分心。
+2. 记牢斜面受力平衡：\(F_N = mg \\cos\\theta\)。
+3. 上传草稿纸拍照，AI 助手会帮你复核受力图哦！`,
+      
+      "化学同分异构体知识总结卡？": `有机化学基础重点：<strong>同分异构体分类</strong> 🧪
+<br><br>
+1. <strong>碳链异构</strong>：碳骨架排列不同。
+2. <strong>位置异构</strong>：官能团位置不同。
+3. <strong>官能团异构</strong>：如乙醇与甲醚。`,
+      
+      "学习有点累了，求鼓励！": `你今天已经完成了<strong>数学和化学</strong>，非常棒！💪
+<br><br>
+*“今日的流汗，是明天衔接高二的底气。”*
+<br><br>
+喝口水，继续加油走完物理专注计时吧！🌟`,
+      
+      "default": `问题收到啦！你可以向我提问具体的**数理化习题**，或者让我帮你排布学习计划！`
+    };
+
+    // 启动 3D 并解析 Markdown
+    init3D();
+    parseAllExistingBubbles();
+  </script>
+
+</body>
+</html>

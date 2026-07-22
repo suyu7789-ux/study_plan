@@ -118,10 +118,123 @@ function initTimerDialMarks() {
   }
 }
 
-const timerAudio = { context: null, soundEnabled: false, ambientEnabled: false, oscillators: null, gain: null, lastTickSecond: null };
+const timerMusicPresets = {
+  flow: {
+    title: "灵动流光",
+    accent: "#2dd4bf",
+    soft: "rgba(45,212,191,.12)",
+    glow: "rgba(45,212,191,.3)",
+    panel: "radial-gradient(circle at 88% 8%,rgba(45,212,191,.2),transparent 44%),linear-gradient(145deg,rgba(10,30,38,.98),rgba(7,12,24,.98))",
+    interval: 600,
+    delay: 0.6,
+    feedback: 0.38,
+    reverb: 2.8,
+  },
+  moon: {
+    title: "月海浮光",
+    accent: "#a78bfa",
+    soft: "rgba(167,139,250,.12)",
+    glow: "rgba(167,139,250,.32)",
+    panel: "radial-gradient(circle at 88% 8%,rgba(167,139,250,.25),transparent 46%),linear-gradient(145deg,rgba(29,20,52,.98),rgba(8,11,25,.98))",
+    interval: 2400,
+    delay: 0.82,
+    feedback: 0.3,
+    reverb: 4.2,
+  },
+  pulse: {
+    title: "深空脉冲",
+    accent: "#38bdf8",
+    soft: "rgba(56,189,248,.12)",
+    glow: "rgba(56,189,248,.32)",
+    panel: "radial-gradient(circle at 88% 8%,rgba(56,189,248,.24),transparent 45%),linear-gradient(145deg,rgba(8,26,48,.98),rgba(6,11,24,.98))",
+    interval: 375,
+    delay: 0.375,
+    feedback: 0.26,
+    reverb: 2.1,
+  },
+  rain: {
+    title: "雨夜星尘",
+    accent: "#f0abfc",
+    soft: "rgba(240,171,252,.12)",
+    glow: "rgba(240,171,252,.3)",
+    panel: "radial-gradient(circle at 88% 8%,rgba(240,171,252,.22),transparent 45%),linear-gradient(145deg,rgba(40,22,51,.98),rgba(10,11,27,.98))",
+    interval: 800,
+    delay: 0.72,
+    feedback: 0.34,
+    reverb: 3.6,
+  },
+};
+
+const timerMusicProgressions = {
+  flow: [
+    { bass: 130.81, notes: [261.63, 329.63, 392, 493.88, 523.25] },
+    { bass: 110, notes: [220, 261.63, 329.63, 392, 440] },
+    { bass: 87.31, notes: [174.61, 220, 329.63, 349.23, 440] },
+    { bass: 98, notes: [196, 293.66, 392, 440, 493.88] },
+  ],
+  moon: [
+    [146.83, 220, 293.66, 369.99],
+    [130.81, 196, 261.63, 329.63],
+    [110, 164.81, 220, 293.66],
+    [98, 146.83, 196, 261.63],
+  ],
+  pulse: [
+    { bass: 73.42, notes: [146.83, 174.61, 220, 261.63] },
+    { bass: 65.41, notes: [130.81, 164.81, 196, 246.94] },
+    { bass: 55, notes: [110, 130.81, 164.81, 220] },
+    { bass: 61.74, notes: [123.47, 146.83, 185, 220] },
+  ],
+  rain: [523.25, 587.33, 659.25, 783.99, 880, 1046.5],
+};
+
+const timerAudio = {
+  context: null,
+  soundEnabled: false,
+  ambientEnabled: false,
+  selectedStyle: "flow",
+  volume: 0.42,
+  masterGain: null,
+  graph: null,
+  sources: [],
+  musicTimer: null,
+  musicStep: 0,
+  sessionId: 0,
+  lastTickSecond: null,
+};
+
+function timerMusicPreferenceKey() {
+  return `changxia.timerMusic.${window.APP_USER?.username || "default"}`;
+}
+
+function loadTimerMusicPreference() {
+  try {
+    const preference = JSON.parse(localStorage.getItem(timerMusicPreferenceKey()) || "{}");
+    if (timerMusicPresets[preference.style]) timerAudio.selectedStyle = preference.style;
+    const volume = Number(preference.volume);
+    if (Number.isFinite(volume)) timerAudio.volume = Math.min(1, Math.max(0, volume));
+  } catch (_error) {
+    // A blocked or malformed local preference should not prevent the timer from loading.
+  }
+}
+
+function saveTimerMusicPreference() {
+  try {
+    localStorage.setItem(timerMusicPreferenceKey(), JSON.stringify({
+      style: timerAudio.selectedStyle,
+      volume: timerAudio.volume,
+    }));
+  } catch (_error) {
+    // Audio remains usable when browser storage is unavailable.
+  }
+}
 
 function initTimerAudio() {
-  if (!timerAudio.context) timerAudio.context = new (window.AudioContext || window.webkitAudioContext)();
+  if (!timerAudio.context) {
+    timerAudio.context = new (window.AudioContext || window.webkitAudioContext)();
+    timerAudio.masterGain = timerAudio.context.createGain();
+    timerAudio.masterGain.gain.value = timerAudio.volume;
+    timerAudio.masterGain.connect(timerAudio.context.destination);
+  }
   if (timerAudio.context.state === "suspended") timerAudio.context.resume();
 }
 
@@ -138,43 +251,269 @@ function playTimerTick(isMajor = false) {
   oscillator.stop(timerAudio.context.currentTime + 0.05);
 }
 
-function startTimerAmbient() {
-  initTimerAudio();
-  if (timerAudio.oscillators) return;
-  const first = timerAudio.context.createOscillator();
-  const second = timerAudio.context.createOscillator();
-  const gain = timerAudio.context.createGain();
-  const filter = timerAudio.context.createBiquadFilter();
-  first.type = "sawtooth";
-  first.frequency.setValueAtTime(55, timerAudio.context.currentTime);
-  first.detune.setValueAtTime(-10, timerAudio.context.currentTime);
-  second.type = "triangle";
-  second.frequency.setValueAtTime(110, timerAudio.context.currentTime);
-  second.detune.setValueAtTime(10, timerAudio.context.currentTime);
-  filter.type = "lowpass";
-  filter.frequency.setValueAtTime(280, timerAudio.context.currentTime);
-  filter.Q.setValueAtTime(4, timerAudio.context.currentTime);
-  gain.gain.setValueAtTime(0, timerAudio.context.currentTime);
-  gain.gain.linearRampToValueAtTime(0.12, timerAudio.context.currentTime + 3);
-  first.connect(filter);
-  second.connect(filter);
-  filter.connect(gain).connect(timerAudio.context.destination);
-  first.start();
-  second.start();
-  timerAudio.oscillators = [first, second];
-  timerAudio.gain = gain;
+function makeTimerMusicImpulse(seconds, decay) {
+  const rate = timerAudio.context.sampleRate;
+  const length = Math.floor(rate * seconds);
+  const impulse = timerAudio.context.createBuffer(2, length, rate);
+  for (let channel = 0; channel < 2; channel += 1) {
+    const data = impulse.getChannelData(channel);
+    for (let index = 0; index < length; index += 1) {
+      data[index] = (Math.random() * 2 - 1) * Math.pow(1 - index / length, decay);
+    }
+  }
+  return impulse;
 }
 
-function stopTimerAmbient() {
-  if (!timerAudio.gain) return;
-  const gain = timerAudio.gain;
-  const oscillators = timerAudio.oscillators;
-  gain.gain.cancelScheduledValues(timerAudio.context.currentTime);
-  gain.gain.setValueAtTime(gain.gain.value, timerAudio.context.currentTime);
-  gain.gain.linearRampToValueAtTime(0, timerAudio.context.currentTime + 1);
-  setTimeout(() => oscillators.forEach((oscillator) => { try { oscillator.stop(); } catch (_error) {} }), 1200);
-  timerAudio.oscillators = null;
-  timerAudio.gain = null;
+function createTimerMusicGraph(preset) {
+  const context = timerAudio.context;
+  const bus = context.createGain();
+  const delay = context.createDelay(2);
+  const delayTone = context.createBiquadFilter();
+  const feedback = context.createGain();
+  const convolver = context.createConvolver();
+  const reverbGain = context.createGain();
+
+  bus.gain.setValueAtTime(0.0001, context.currentTime);
+  bus.gain.exponentialRampToValueAtTime(1, context.currentTime + 0.3);
+  delay.delayTime.value = preset.delay;
+  delayTone.type = "lowpass";
+  delayTone.frequency.value = 2600;
+  feedback.gain.value = preset.feedback;
+  convolver.buffer = makeTimerMusicImpulse(preset.reverb, 2.7);
+  reverbGain.gain.value = timerAudio.selectedStyle === "moon" ? 0.33 : 0.2;
+
+  bus.connect(timerAudio.masterGain);
+  delay.connect(delayTone);
+  delayTone.connect(feedback);
+  feedback.connect(delay);
+  delayTone.connect(bus);
+  convolver.connect(reverbGain);
+  reverbGain.connect(bus);
+
+  return { bus, delay, convolver, nodes: [bus, delay, delayTone, feedback, convolver, reverbGain] };
+}
+
+function trackTimerMusicSource(source, cleanupNodes = []) {
+  timerAudio.sources.push(source);
+  source.addEventListener("ended", () => {
+    timerAudio.sources = timerAudio.sources.filter((item) => item !== source);
+    [source, ...cleanupNodes].forEach((node) => {
+      try { node.disconnect(); } catch (_error) {}
+    });
+  }, { once: true });
+}
+
+function triggerTimerMusicTone(frequency, options = {}) {
+  if (!timerAudio.graph) return;
+  const context = timerAudio.context;
+  const now = context.currentTime;
+  const duration = options.duration || 1.2;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const filter = context.createBiquadFilter();
+  const panner = context.createStereoPanner();
+
+  oscillator.type = options.type || "sine";
+  oscillator.frequency.setValueAtTime(frequency, now);
+  if (options.detune) oscillator.detune.value = options.detune;
+  filter.type = "lowpass";
+  filter.frequency.value = options.filter || 4200;
+  filter.Q.value = 0.35;
+  panner.pan.value = options.pan || 0;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(options.gain || 0.025, now + (options.attack || 0.035));
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  oscillator.connect(filter);
+  filter.connect(gain);
+  gain.connect(panner);
+  panner.connect(timerAudio.graph.bus);
+  if (options.echo !== false) panner.connect(timerAudio.graph.delay);
+  if (options.reverb !== false) panner.connect(timerAudio.graph.convolver);
+  oscillator.start(now);
+  oscillator.stop(now + duration + 0.08);
+  trackTimerMusicSource(oscillator, [filter, gain, panner]);
+}
+
+function triggerTimerMusicPad(notes) {
+  notes.forEach((frequency, index) => {
+    triggerTimerMusicTone(frequency, {
+      type: index === 0 ? "triangle" : "sine",
+      gain: index === 0 ? 0.022 : 0.012,
+      duration: 5.4,
+      attack: 1.1,
+      filter: 1500,
+      pan: (index - 1.5) * 0.2,
+      echo: false,
+    });
+    if (index > 0) {
+      triggerTimerMusicTone(frequency, {
+        gain: 0.006,
+        duration: 5,
+        attack: 1.4,
+        detune: 7,
+        filter: 1300,
+        pan: (1.5 - index) * 0.2,
+        echo: false,
+      });
+    }
+  });
+}
+
+function startTimerMusicRain() {
+  const context = timerAudio.context;
+  const length = context.sampleRate * 4;
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for (let index = 0; index < length; index += 1) {
+    const white = Math.random() * 2 - 1;
+    last = last * 0.985 + white * 0.015;
+    data[index] = white * 0.28 + last * 1.6;
+  }
+  const source = context.createBufferSource();
+  const highpass = context.createBiquadFilter();
+  const lowpass = context.createBiquadFilter();
+  const gain = context.createGain();
+  source.buffer = buffer;
+  source.loop = true;
+  highpass.type = "highpass";
+  highpass.frequency.value = 650;
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = 5200;
+  gain.gain.value = 0.032;
+  source.connect(highpass);
+  highpass.connect(lowpass);
+  lowpass.connect(gain);
+  gain.connect(timerAudio.graph.bus);
+  gain.connect(timerAudio.graph.convolver);
+  source.start();
+  trackTimerMusicSource(source, [highpass, lowpass, gain]);
+}
+
+function playTimerMusicFlow(step) {
+  const chord = timerMusicProgressions.flow[Math.floor((step % 32) / 8)];
+  const position = step % 8;
+  const pattern = [0, 2, 1, 3, 0, 2, 4, 1];
+  triggerTimerMusicTone(chord.notes[pattern[position]], { gain: 0.026, duration: 0.85, pan: position % 2 ? 0.25 : -0.25 });
+  if (position === 0) triggerTimerMusicTone(chord.bass, { type: "triangle", gain: 0.045, duration: 3.5, filter: 900, echo: false });
+  if (position === 2) triggerTimerMusicTone([659.25, 783.99, 880, 987.77][Math.floor((step % 32) / 8)], { gain: 0.014, duration: 2.4, pan: 0.35 });
+}
+
+function playTimerMusicMoon(step) {
+  triggerTimerMusicPad(timerMusicProgressions.moon[step % timerMusicProgressions.moon.length]);
+  if (step % 2 === 1) {
+    triggerTimerMusicTone([440, 392, 329.63, 293.66][step % 4], { gain: 0.011, duration: 4.2, attack: 0.65, pan: step % 4 === 1 ? -0.4 : 0.4 });
+  }
+}
+
+function playTimerMusicPulse(step) {
+  const chord = timerMusicProgressions.pulse[Math.floor((step % 32) / 8)];
+  const position = step % 8;
+  const pattern = [0, 0, 2, 1, 0, 3, 2, 1];
+  triggerTimerMusicTone(chord.notes[pattern[position]], { type: "triangle", gain: 0.022, duration: 0.34, filter: 1900, pan: position % 2 ? 0.18 : -0.18 });
+  if (position % 4 === 0) triggerTimerMusicTone(chord.bass, { type: "sine", gain: 0.07, duration: 0.5, attack: 0.018, filter: 500, echo: false, reverb: false });
+  if (position === 6) triggerTimerMusicTone(chord.notes[3] * 2, { gain: 0.008, duration: 1.4, pan: 0.42 });
+}
+
+function playTimerMusicRain(step) {
+  if (![0, 3, 7, 10].includes(step % 12)) return;
+  const notes = timerMusicProgressions.rain;
+  const frequency = notes[(step * 5 + Math.floor(step / 3)) % notes.length];
+  triggerTimerMusicTone(frequency, { gain: 0.017, duration: 2.8, attack: 0.02, pan: Math.sin(step * 1.7) * 0.5 });
+  triggerTimerMusicTone(frequency * 2.01, { gain: 0.004, duration: 1.6, attack: 0.012, pan: -Math.sin(step * 1.7) * 0.4 });
+}
+
+function startTimerAmbient() {
+  initTimerAudio();
+  if (timerAudio.graph || timerAudio.musicTimer) return;
+  const style = timerAudio.selectedStyle;
+  const preset = timerMusicPresets[style];
+  timerAudio.graph = createTimerMusicGraph(preset);
+  timerAudio.musicStep = 0;
+  if (style === "rain") startTimerMusicRain();
+
+  const playStep = () => {
+    const step = timerAudio.musicStep;
+    if (style === "flow") playTimerMusicFlow(step);
+    if (style === "moon") playTimerMusicMoon(step);
+    if (style === "pulse") playTimerMusicPulse(step);
+    if (style === "rain") playTimerMusicRain(step);
+    timerAudio.musicStep += 1;
+  };
+  playStep();
+  timerAudio.musicTimer = window.setInterval(playStep, preset.interval);
+}
+
+function stopTimerAmbient(fadeSeconds = 0.18) {
+  timerAudio.sessionId += 1;
+  if (timerAudio.musicTimer) window.clearInterval(timerAudio.musicTimer);
+  timerAudio.musicTimer = null;
+  const graph = timerAudio.graph;
+  const sources = timerAudio.sources;
+  timerAudio.graph = null;
+  timerAudio.sources = [];
+  if (graph && timerAudio.context) {
+    const now = timerAudio.context.currentTime;
+    graph.bus.gain.cancelScheduledValues(now);
+    graph.bus.gain.setValueAtTime(Math.max(graph.bus.gain.value, 0.0001), now);
+    graph.bus.gain.exponentialRampToValueAtTime(0.0001, now + fadeSeconds);
+  }
+  window.setTimeout(() => {
+    sources.forEach((source) => {
+      try { source.stop(); } catch (_error) {}
+    });
+    graph?.nodes.forEach((node) => {
+      try { node.disconnect(); } catch (_error) {}
+    });
+  }, fadeSeconds * 1000 + 40);
+}
+
+function applyTimerMusicTheme() {
+  const preset = timerMusicPresets[timerAudio.selectedStyle];
+  const panel = document.getElementById("musicPanel");
+  panel.style.setProperty("--music-accent", preset.accent);
+  panel.style.setProperty("--music-soft", preset.soft);
+  panel.style.setProperty("--music-glow", preset.glow);
+  panel.style.setProperty("--music-panel-bg", preset.panel);
+  document.getElementById("musicPanelTitle").textContent = preset.title;
+  document.querySelectorAll("[data-music-style]").forEach((option) => {
+    const selected = option.dataset.musicStyle === timerAudio.selectedStyle;
+    option.classList.toggle("is-selected", selected);
+    option.setAttribute("aria-checked", String(selected));
+  });
+}
+
+function updateTimerMusicUI() {
+  const ambientButton = document.getElementById("btnAmbient");
+  const powerButton = document.getElementById("musicPower");
+  ambientButton.classList.toggle("is-active", timerAudio.ambientEnabled);
+  powerButton.classList.toggle("is-playing", timerAudio.ambientEnabled);
+  powerButton.innerHTML = timerAudio.ambientEnabled
+    ? '<i data-lucide="pause"></i><span>停止播放</span>'
+    : '<i data-lucide="play"></i><span>开始播放</span>';
+  refreshIcons();
+}
+
+function closeTimerMusicPanel() {
+  const panel = document.getElementById("musicPanel");
+  panel.hidden = true;
+  document.getElementById("btnAmbient").setAttribute("aria-expanded", "false");
+}
+
+function selectTimerMusicStyle(style) {
+  if (!timerMusicPresets[style]) return;
+  const wasPlaying = timerAudio.ambientEnabled;
+  stopTimerAmbient();
+  timerAudio.selectedStyle = style;
+  timerAudio.ambientEnabled = true;
+  applyTimerMusicTheme();
+  saveTimerMusicPreference();
+  updateTimerMusicUI();
+  const switchId = timerAudio.sessionId;
+  window.setTimeout(() => {
+    if (timerAudio.ambientEnabled && switchId === timerAudio.sessionId) startTimerAmbient();
+  }, wasPlaying ? 220 : 0);
 }
 
 function setupTimerClockExperience() {
@@ -182,7 +521,17 @@ function setupTimerClockExperience() {
   const soundButton = document.getElementById("btnSound");
   const ambientButton = document.getElementById("btnAmbient");
   const themeButton = document.getElementById("btnTheme");
-  if (!shell || !soundButton || !ambientButton || !themeButton) return;
+  const musicPanel = document.getElementById("musicPanel");
+  const musicPanelClose = document.getElementById("musicPanelClose");
+  const musicPower = document.getElementById("musicPower");
+  const musicVolume = document.getElementById("musicVolume");
+  const musicVolumeValue = document.getElementById("musicVolumeValue");
+  if (!shell || !soundButton || !ambientButton || !themeButton || !musicPanel) return;
+  loadTimerMusicPreference();
+  musicVolume.value = String(timerAudio.volume);
+  musicVolumeValue.textContent = `${Math.round(timerAudio.volume * 100)}%`;
+  applyTimerMusicTheme();
+  updateTimerMusicUI();
   soundButton.addEventListener("click", () => {
     initTimerAudio();
     timerAudio.soundEnabled = !timerAudio.soundEnabled;
@@ -190,11 +539,29 @@ function setupTimerClockExperience() {
     if (timerAudio.soundEnabled) playTimerTick(false);
   });
   ambientButton.addEventListener("click", () => {
+    const isOpen = !musicPanel.hidden;
+    musicPanel.hidden = isOpen;
+    ambientButton.setAttribute("aria-expanded", String(!isOpen));
+  });
+  musicPanelClose.addEventListener("click", closeTimerMusicPanel);
+  musicPower.addEventListener("click", () => {
     initTimerAudio();
     timerAudio.ambientEnabled = !timerAudio.ambientEnabled;
-    ambientButton.classList.toggle("is-active", timerAudio.ambientEnabled);
     if (timerAudio.ambientEnabled) startTimerAmbient();
     else stopTimerAmbient();
+    updateTimerMusicUI();
+  });
+  document.querySelectorAll("[data-music-style]").forEach((option) => {
+    option.addEventListener("click", () => selectTimerMusicStyle(option.dataset.musicStyle));
+  });
+  musicVolume.addEventListener("input", (event) => {
+    timerAudio.volume = Number(event.target.value);
+    musicVolumeValue.textContent = `${Math.round(timerAudio.volume * 100)}%`;
+    if (timerAudio.masterGain) timerAudio.masterGain.gain.setTargetAtTime(timerAudio.volume, timerAudio.context.currentTime, 0.035);
+    saveTimerMusicPreference();
+  });
+  document.addEventListener("click", (event) => {
+    if (!musicPanel.hidden && !musicPanel.contains(event.target) && !ambientButton.contains(event.target)) closeTimerMusicPanel();
   });
   const themes = [
     { blue: "#e0aaff", mint: "#c77dff", pink: "#9d4edd", purple: "#7b2cbf", yellow: "#3c096c" },
@@ -539,6 +906,7 @@ function openImage(image) {
 }
 
 function closeModal(id) {
+  if (id === "timerModal") closeTimerMusicPanel();
   document.getElementById(id).hidden = true;
 }
 
@@ -892,6 +1260,11 @@ document.getElementById("passwordForm").addEventListener("submit", async (event)
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    const musicPanel = document.getElementById("musicPanel");
+    if (musicPanel && !musicPanel.hidden) {
+      closeTimerMusicPanel();
+      return;
+    }
     closeEvidenceGuides();
     document.querySelectorAll(".modal-backdrop:not([hidden])").forEach((modal) => { modal.hidden = true; });
     closeSidebar();
@@ -911,3 +1284,826 @@ async function start() {
 
 setupTimerClockExperience();
 start();
+
+
+/* =================================================== */
+/* AI AGENT 3D 太空萌宠与双端自适应对话系统 JS 驱动核心 */
+/* =================================================== */
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("webglContainer")) {
+    initAgentPet();
+    initAgentDrawer();
+  }
+});
+
+let agentThreeScene, agentCamera, agentRenderer;
+let agentRobotGroup, agentHead, agentBody, agentLeftEar, agentRightEar, agentLeftEye, agentRightEye;
+let agentLeftBlush, agentRightBlush, agentBaseRing, agentBadge, agentBadgeLight, agentBaseRingMaterial, agentBlushMaterial, agentBadgeMaterial;
+let agentLeftEarCollider, agentRightEarCollider;
+let agentMouse = { x: 0, y: 0 };
+let agentJumpTime = 0;
+let agentIsJumping = false;
+let agentIsHovered = false;
+
+let agentEarTwitchTimer = 0;
+let agentHeadNudgeTimer = 0;
+let agentBaseRingTargetSpin = 0.015;
+let agentBaseRingCurrentSpin = 0.015;
+let agentBadgeTargetScale = 1.0;
+let agentBadgeCurrentScale = 1.0;
+let agentBadgeLightTargetIntensity = 0.0;
+let agentBadgeLightCurrentIntensity = 0.0;
+let agentHoverTime = 0;
+let agentAvatarDataUrl = "";
+
+function initAgentPet() {
+  const container = document.getElementById("webglContainer");
+  if (!container) return;
+
+  agentThreeScene = new THREE.Scene();
+  agentCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  agentCamera.position.set(0, 0, 5.0);
+
+  agentRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  agentRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  agentRenderer.setSize(100, 100);
+  agentRenderer.shadowMap.enabled = true;
+  container.appendChild(agentRenderer.domElement);
+
+  agentRobotGroup = new THREE.Group();
+  agentThreeScene.add(agentRobotGroup);
+
+  const porcelainMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 0.12, metalness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.08
+  });
+  const screenMat = new THREE.MeshStandardMaterial({
+    color: 0x070913, roughness: 0.08, metalness: 0.95
+  });
+  const eyeGlowMat = new THREE.MeshStandardMaterial({
+    color: 0x2dd4bf, emissive: 0x2dd4bf, emissiveIntensity: 2.0
+  });
+  agentBlushMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff5d9e, emissive: 0xff5d9e, emissiveIntensity: 1.5
+  });
+  agentBadgeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2dd4bf, emissive: 0x2dd4bf, emissiveIntensity: 2.5
+  });
+  agentBaseRingMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8c70ed, emissive: 0x8c70ed, emissiveIntensity: 1.8
+  });
+
+  // 头部
+  agentHead = new THREE.Mesh(new THREE.SphereGeometry(0.75, 32, 32), porcelainMat);
+  agentHead.position.y = 0.2;
+  agentRobotGroup.add(agentHead);
+
+  const screenGeom = new THREE.SphereGeometry(0.756, 32, 32, Math.PI / 2 - Math.PI / 3, Math.PI * 2 / 3, Math.PI / 4 + 0.05, Math.PI / 2.1);
+  const screen = new THREE.Mesh(screenGeom, screenMat);
+  agentHead.add(screen);
+
+  agentLeftEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), eyeGlowMat);
+  agentLeftEye.scale.set(1, 1.25, 0.5);
+  agentLeftEye.position.set(-0.24, 0.08, 0.71);
+  agentHead.add(agentLeftEye);
+
+  agentRightEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), eyeGlowMat);
+  agentRightEye.scale.set(1, 1.25, 0.5);
+  agentRightEye.position.set(0.24, 0.08, 0.71);
+  agentHead.add(agentRightEye);
+
+  const mouthGeom = new THREE.TorusGeometry(0.038, 0.012, 8, 16, Math.PI);
+  const leftMouth = new THREE.Mesh(mouthGeom, eyeGlowMat);
+  leftMouth.rotation.set(0, 0, Math.PI);
+  leftMouth.position.set(-0.035, -0.07, 0.725);
+  agentHead.add(leftMouth);
+
+  const rightMouth = new THREE.Mesh(mouthGeom, eyeGlowMat);
+  rightMouth.rotation.set(0, 0, Math.PI);
+  rightMouth.position.set(0.035, -0.07, 0.725);
+  agentHead.add(rightMouth);
+
+  agentLeftBlush = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), agentBlushMaterial);
+  agentLeftBlush.scale.set(1.6, 0.8, 0.5);
+  agentLeftBlush.position.set(-0.36, -0.1, 0.66);
+  agentHead.add(agentLeftBlush);
+
+  agentRightBlush = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), agentBlushMaterial);
+  agentRightBlush.scale.set(1.6, 0.8, 0.5);
+  agentRightBlush.position.set(0.36, -0.1, 0.66);
+  agentHead.add(agentRightBlush);
+
+  const earGeom = new THREE.ConeGeometry(0.18, 0.35, 4);
+  agentLeftEar = new THREE.Mesh(earGeom, porcelainMat);
+  agentLeftEar.position.set(-0.45, 0.6, -0.1);
+  agentLeftEar.rotation.set(0.2, 0.0, 0.45);
+  agentHead.add(agentLeftEar);
+
+  agentRightEar = new THREE.Mesh(earGeom, porcelainMat);
+  agentRightEar.position.set(0.45, 0.6, -0.1);
+  agentRightEar.rotation.set(0.2, 0.0, -0.45);
+  agentHead.add(agentRightEar);
+
+  const colliderGeom = new THREE.SphereGeometry(0.24, 8, 8);
+  const colliderMat = new THREE.MeshBasicMaterial({ visible: false });
+  agentLeftEarCollider = new THREE.Mesh(colliderGeom, colliderMat);
+  agentLeftEarCollider.position.set(-0.45, 0.6, -0.1);
+  agentHead.add(agentLeftEarCollider);
+
+  agentRightEarCollider = new THREE.Mesh(colliderGeom, colliderMat);
+  agentRightEarCollider.position.set(0.45, 0.6, -0.1);
+  agentHead.add(agentRightEarCollider);
+
+  agentBody = new THREE.Mesh(new THREE.SphereGeometry(0.58, 32, 32), porcelainMat);
+  agentBody.scale.set(1.0, 1.2, 1.0);
+  agentBody.position.y = -0.65;
+  agentRobotGroup.add(agentBody);
+
+  agentBadge = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 16), agentBadgeMaterial);
+  agentBadge.position.set(0, 0.12, 0.615);
+  agentBody.add(agentBadge);
+
+  const armGeom = new THREE.SphereGeometry(0.11, 16, 16);
+  const leftArm = new THREE.Mesh(armGeom, porcelainMat);
+  leftArm.position.set(-0.68, -0.5, 0.15);
+  agentRobotGroup.add(leftArm);
+
+  const rightArm = new THREE.Mesh(armGeom, porcelainMat);
+  rightArm.position.set(0.68, -0.5, 0.15);
+  agentRobotGroup.add(rightArm);
+
+  const torusGeom = new THREE.TorusGeometry(0.9, 0.04, 8, 48);
+  agentBaseRing = new THREE.Mesh(torusGeom, agentBaseRingMaterial);
+  agentBaseRing.rotation.x = Math.PI / 2;
+  agentBaseRing.position.y = -1.35;
+  agentRobotGroup.add(agentBaseRing);
+
+  const nodeGeom = new THREE.BoxGeometry(0.12, 0.06, 0.12);
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI * 2) / 3;
+    const node = new THREE.Mesh(nodeGeom, eyeGlowMat);
+    node.position.set(Math.cos(angle) * 0.9, Math.sin(angle) * 0.9, 0);
+    agentBaseRing.add(node);
+  }
+
+  const ambientLight = new THREE.AmbientLight(0x0e172e, 1.6);
+  agentThreeScene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+  dirLight.position.set(2, 5, 4);
+  agentThreeScene.add(dirLight);
+
+  const faceLight = new THREE.PointLight(0xffffff, 1.5, 4);
+  faceLight.position.set(0, 0.5, 1.5);
+  agentThreeScene.add(faceLight);
+
+  agentBadgeLight = new THREE.PointLight(0x2dd4bf, 0.0, 2.2);
+  agentBadgeLight.position.set(0, -0.5, 1.0);
+  agentThreeScene.add(agentBadgeLight);
+
+  const cyanLight = new THREE.PointLight(0x2dd4bf, 2.5, 6);
+  cyanLight.position.set(-2.5, -0.5, 1.5);
+  agentThreeScene.add(cyanLight);
+
+  const purpleLight = new THREE.PointLight(0x8c70ed, 2.5, 6);
+  purpleLight.position.set(2.5, -1.5, 1.5);
+  agentThreeScene.add(purpleLight);
+
+  animateAgent3D();
+
+  // 对焦快照
+  setTimeout(() => {
+    try {
+      const origPos = agentCamera.position.clone();
+      agentCamera.position.set(0, -0.2, 4.4);
+      agentCamera.lookAt(0, -0.2, 0);
+      agentRenderer.render(agentThreeScene, agentCamera);
+      agentAvatarDataUrl = agentRenderer.domElement.toDataURL("image/png");
+
+      agentCamera.position.copy(origPos);
+      agentCamera.lookAt(new THREE.Vector3(0, 0, 0));
+      agentRenderer.render(agentThreeScene, agentCamera);
+
+      const headerAvatar = document.getElementById("headerAvatar");
+      if (headerAvatar) headerAvatar.src = agentAvatarDataUrl;
+    } catch (e) {
+      console.error("Pet avatar capture failed:", e);
+    }
+  }, 150);
+
+  // 绑动手势/鼠标监听
+  document.addEventListener("mousemove", (e) => {
+    const petBody = document.getElementById("petAvatarBody");
+    if (!petBody) return;
+    const rect = petBody.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    agentMouse.x = Math.max(-1, Math.min(1, ((e.clientX - cx) / window.innerWidth) * 12));
+    agentMouse.y = Math.max(-1, Math.min(1, ((e.clientY - cy) / window.innerHeight) * 12));
+  });
+
+  const petContainer = document.getElementById("desktopPetContainer");
+  if (petContainer) {
+    petContainer.addEventListener("mouseenter", () => { agentIsHovered = true; });
+    petContainer.addEventListener("mouseleave", () => { agentIsHovered = false; });
+    
+    petContainer.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openAgentDrawer();
+      triggerPetRaycast(e);
+    });
+
+    petContainer.addEventListener("touchstart", (e) => {
+      e.stopPropagation();
+      agentIsHovered = true;
+      openAgentDrawer();
+      if (e.touches && e.touches[0]) triggerPetRaycast(e.touches[0]);
+    });
+  }
+}
+
+function animateAgent3D() {
+  requestAnimationFrame(animateAgent3D);
+  const time = Date.now() * 0.0015;
+
+  if (!agentIsJumping) {
+    currentY = Math.sin(time * 1.5) * 0.12;
+    agentRobotGroup.position.y = currentY;
+  } else {
+    agentJumpTime += 0.05;
+    if (agentJumpTime >= Math.PI) {
+      agentIsJumping = false;
+      agentRobotGroup.position.y = currentY;
+    } else {
+      agentRobotGroup.position.y = currentY + Math.sin(agentJumpTime) * 1.3;
+      agentRobotGroup.rotation.x = agentJumpTime * 2;
+    }
+  }
+
+  const targetRotY = agentMouse.x * 0.45;
+  const targetRotX = -agentMouse.y * 0.3;
+
+  if (agentHeadNudgeTimer <= 0) {
+    agentHead.rotation.y += (targetRotY - agentHead.rotation.y) * 0.12;
+    agentHead.rotation.x += (targetRotX - agentHead.rotation.x) * 0.12;
+    agentHead.rotation.z += (0 - agentHead.rotation.z) * 0.1;
+  }
+  agentBody.rotation.y += (targetRotY * 0.25 - agentBody.rotation.y) * 0.1;
+
+  let eyeScaleX = 1.0;
+  let eyeScaleY = 1.25;
+
+  if (agentIsHovered) {
+    agentHoverTime += 0.016;
+    if (agentHoverTime < 0.6) {
+      const wink = Math.sin(agentHoverTime * Math.PI * 2 / 0.3);
+      if (wink < 0) eyeScaleY = 0.08;
+    } else {
+      eyeScaleX = 1.25 + Math.sin(time * 10) * 0.06;
+      eyeScaleY = 1.25 + Math.sin(time * 10) * 0.06;
+    }
+    agentBlushMaterial.emissiveIntensity = 3.2;
+    agentLeftEar.rotation.z += (1.0 - agentLeftEar.rotation.z) * 0.15;
+    agentRightEar.rotation.z += (-1.0 - agentRightEar.rotation.z) * 0.15;
+  } else {
+    agentHoverTime = 0;
+    agentBlushMaterial.emissiveIntensity = 1.5;
+    agentLeftEar.rotation.z += (0.45 - agentLeftEar.rotation.z) * 0.12;
+    agentRightEar.rotation.z += (-0.45 - agentRightEar.rotation.z) * 0.12;
+  }
+
+  if (agentEarTwitchTimer > 0) {
+    agentEarTwitchTimer -= 0.016;
+    const twitch = Math.sin(Date.now() * 0.09) * 0.28;
+    agentLeftEar.rotation.z = (agentIsHovered ? 1.0 : 0.45) + twitch;
+    agentRightEar.rotation.z = (agentIsHovered ? -1.0 : -0.45) - twitch;
+  }
+
+  if (agentHeadNudgeTimer > 0) {
+    agentHeadNudgeTimer -= 0.016;
+    agentHead.rotation.z = Math.sin(agentHeadNudgeTimer * Math.PI * 4.0) * 0.24;
+    agentHead.rotation.x = Math.abs(Math.sin(agentHeadNudgeTimer * Math.PI * 2.0)) * 0.12;
+  }
+
+  let finalEyeY = eyeScaleY;
+  if (!agentIsHovered) {
+    if ((time % 4) > 3.8) finalEyeY = 0.08;
+  }
+  agentLeftEye.scale.set(eyeScaleX, finalEyeY, 0.5);
+  agentRightEye.scale.set(eyeScaleX, finalEyeY, 0.5);
+
+  agentBaseRingCurrentSpin += (agentBaseRingTargetSpin - agentBaseRingCurrentSpin) * 0.08;
+  agentBaseRing.rotation.z -= agentBaseRingCurrentSpin;
+  if (agentBaseRingTargetSpin > 0.015) agentBaseRingTargetSpin -= 0.003;
+
+  agentBadgeCurrentScale += (agentBadgeTargetScale - agentBadgeCurrentScale) * 0.12;
+  agentBadge.scale.set(agentBadgeCurrentScale, agentBadgeCurrentScale, agentBadgeCurrentScale * 0.45);
+  if (agentBadgeTargetScale > 1.0) {
+    agentBadgeMaterial.color.setHex(0xffffff);
+    agentBadgeMaterial.emissive.setHex(0xffffff);
+    agentBadgeMaterial.emissiveIntensity = 8.0;
+    agentBadgeTargetScale -= 0.035;
+  } else {
+    agentBadgeMaterial.color.setHex(0x2dd4bf);
+    agentBadgeMaterial.emissive.setHex(0x2dd4bf);
+    agentBadgeMaterial.emissiveIntensity = 2.5;
+  }
+
+  agentBadgeLightCurrentIntensity += (agentBadgeLightTargetIntensity - agentBadgeLightCurrentIntensity) * 0.12;
+  agentBadgeLight.intensity = agentBadgeLightCurrentIntensity;
+  if (agentBadgeLightTargetIntensity > 0.0) agentBadgeLightTargetIntensity -= 0.15;
+
+  agentBaseRing.position.y = -1.35 + Math.sin(time * 1.5 - 0.5) * 0.07;
+  agentBaseRingMaterial.emissiveIntensity = (1.6 + Math.sin(time * 3.5) * 0.4) * (agentBaseRingCurrentSpin * 20.0);
+
+  if (!agentIsJumping) {
+    agentRobotGroup.rotation.x += (0 - agentRobotGroup.rotation.x) * 0.1;
+    agentRobotGroup.rotation.y += (0 - agentRobotGroup.rotation.y) * 0.1;
+  }
+
+  agentRenderer.render(agentThreeScene, agentCamera);
+}
+
+function triggerPetRaycast(eventClient) {
+  if (!agentRenderer || !agentCamera) return;
+  const raycaster = new THREE.Raycaster();
+  const mouse3d = new THREE.Vector2();
+  const rect = agentRenderer.domElement.getBoundingClientRect();
+
+  mouse3d.x = ((eventClient.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse3d.y = -((eventClient.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse3d, agentCamera);
+  const intersects = raycaster.intersectObjects(agentRobotGroup.children, true);
+
+  if (intersects.length > 0) {
+    let hitObj = intersects[0].object;
+    if (hitObj.parent === agentBaseRing) hitObj = agentBaseRing;
+
+    if (hitObj === agentLeftEar || hitObj === agentRightEar || hitObj === agentLeftEarCollider || hitObj === agentRightEarCollider) {
+      agentEarTwitchTimer = 1.2;
+      triggerSpeechBubble(["喵呜～捏捏猫耳，精力拉满！😸", "耳朵竖起来听你说话呢！👂"]);
+    } else if (hitObj === agentHead) {
+      agentHeadNudgeTimer = 1.0;
+      triggerSpeechBubble(["摸摸猫头，专注度爆发！✨", "好舒服～加油自习哦！😸"]);
+    } else if (hitObj === agentBadge) {
+      agentBadgeTargetScale = 1.8;
+      agentBadgeLightTargetIntensity = 5.0;
+      triggerSpeechBubble(["CX 核心充能 100%！⚡", "爆发出巨大的专注能量！🔥"]);
+    } else if (hitObj === agentBaseRing) {
+      agentBaseRingTargetSpin = 0.25;
+      triggerSpeechBubble(["反重力发动机超载！🚀", "要飞往星辰大海啦！✨"]);
+    } else {
+      triggerAgentJump();
+      for (let i = 0; i < 3; i++) spawnFloatingHeart();
+    }
+  } else {
+    triggerAgentJump();
+    for (let i = 0; i < 3; i++) spawnFloatingHeart();
+  }
+}
+
+function triggerAgentJump() {
+  if (agentIsJumping) return;
+  agentIsJumping = true;
+  agentJumpTime = 0;
+}
+
+let speechTimer = null;
+function triggerSpeechBubble(speechList) {
+  const speechBubble = document.getElementById("petSpeechBubble");
+  if (!speechBubble) return;
+  if (speechTimer) clearTimeout(speechTimer);
+
+  const text = speechList[Math.floor(Math.random() * speechList.length)];
+  speechBubble.textContent = text;
+  speechBubble.classList.add("is-visible");
+
+  speechTimer = setTimeout(() => {
+    speechBubble.classList.remove("is-visible");
+  }, 4000);
+}
+
+function spawnFloatingHeart() {
+  const container = document.getElementById("desktopPetContainer");
+  if (!container) return;
+  const heart = document.createElement("div");
+  heart.className = "floating-heart";
+  heart.innerHTML = "♥";
+
+  const startX = Math.random() * 40 + 30;
+  const dx = (Math.random() - 0.5) * 60;
+  const duration = 0.8 + Math.random() * 0.5;
+
+  heart.style.left = `${startX}px`;
+  heart.style.bottom = "40px";
+  heart.style.setProperty("--dx", `${dx}px`);
+  heart.style.setProperty("--duration", `${duration}s`);
+
+  container.appendChild(heart);
+  setTimeout(() => heart.remove(), duration * 1000);
+}
+
+// Drawer Toggle Logic
+function openAgentDrawer() {
+  const panel = document.getElementById("agentPanel");
+  const pet = document.getElementById("desktopPetContainer");
+  const backdrop = document.getElementById("agentDrawerBackdrop");
+
+  if (panel) {
+    panel.classList.remove("is-closed");
+    panel.classList.add("is-open");
+  }
+  if (pet) pet.classList.add("panel-open");
+  if (backdrop) backdrop.classList.add("is-visible");
+
+  // 初始化获取历史
+  fetchAgentHistory("physics");
+}
+
+function closeAgentDrawer() {
+  const panel = document.getElementById("agentPanel");
+  const pet = document.getElementById("desktopPetContainer");
+  const backdrop = document.getElementById("agentDrawerBackdrop");
+
+  if (panel) {
+    panel.classList.add("is-closed");
+    panel.classList.remove("is-open");
+  }
+  if (pet) pet.classList.remove("panel-open");
+  if (backdrop) backdrop.classList.remove("is-visible");
+}
+
+
+// ==========================================
+// Agent UI & API Interaction Engine
+// ==========================================
+let currentSessionId = "physics";
+let uploadedFileUrl = "";
+let uploadedFileName = "";
+let uploadedFileSizeStr = "";
+
+function initAgentDrawer() {
+  const closeBtn = document.getElementById("closePanelBtn");
+  const backdrop = document.getElementById("agentDrawerBackdrop");
+  const handleBar = document.getElementById("drawerHandleBar");
+  const sendBtn = document.getElementById("sendBtn");
+  const chatInput = document.getElementById("chatInput");
+  const attachBtn = document.getElementById("attachBtn");
+  const voiceBtn = document.getElementById("voiceBtn");
+  const historyBtn = document.getElementById("historyBtn");
+  const backChatBtn = document.getElementById("backChatBtn");
+
+  if (closeBtn) closeBtn.addEventListener("click", closeAgentDrawer);
+  if (backdrop) backdrop.addEventListener("click", closeAgentDrawer);
+  if (handleBar) handleBar.addEventListener("click", closeAgentDrawer);
+
+  if (sendBtn) sendBtn.addEventListener("click", () => handleAgentSend(chatInput ? chatInput.value : ""));
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleAgentSend(chatInput.value);
+    });
+  }
+
+  // 附件上传绑定
+  if (attachBtn) {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.style.display = "none";
+    document.body.appendChild(fileInput);
+
+    attachBtn.addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await fetch("/api/agent/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.ok) {
+          uploadedFileUrl = data.url;
+          uploadedFileName = data.filename;
+          uploadedFileSizeStr = data.size_str;
+
+          const previewContainer = document.getElementById("uploadPreviewContainer");
+          const previewThumb = document.getElementById("uploadPreviewThumb");
+          const previewFileIcon = document.getElementById("uploadPreviewFileIcon");
+          const previewName = document.getElementById("uploadPreviewName");
+
+          if (data.is_image) {
+            previewThumb.src = data.url;
+            previewThumb.style.display = "block";
+            previewFileIcon.style.display = "none";
+          } else {
+            previewThumb.style.display = "none";
+            previewFileIcon.style.display = "flex";
+            previewFileIcon.innerHTML = getFileIconSvg(data.ext);
+          }
+
+          if (previewName) previewName.textContent = `${data.filename} (${data.size_str})`;
+          if (previewContainer) previewContainer.style.display = "block";
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+      }
+    });
+  }
+
+  const removeBtn = document.getElementById("uploadPreviewRemove");
+  if (removeBtn) {
+    removeBtn.addEventListener("click", () => {
+      uploadedFileUrl = "";
+      uploadedFileName = "";
+      uploadedFileSizeStr = "";
+      const container = document.getElementById("uploadPreviewContainer");
+      if (container) container.style.display = "none";
+    });
+  }
+
+  // 芯片点击
+  document.querySelectorAll(".chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      handleAgentSend(chip.dataset.text || chip.textContent);
+    });
+  });
+
+  // 历史遮罩
+  const historyOverlay = document.getElementById("historyOverlay");
+  if (historyBtn && historyOverlay) {
+    historyBtn.addEventListener("click", () => {
+      historyOverlay.classList.add("is-open");
+      renderHistoryListUI();
+    });
+  }
+  if (backChatBtn && historyOverlay) {
+    backChatBtn.addEventListener("click", () => {
+      historyOverlay.classList.remove("is-open");
+    });
+  }
+
+  const searchInput = document.getElementById("historySearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      filterHistoryList(e.target.value.toLowerCase());
+    });
+  }
+}
+
+function getFileIconSvg(ext) {
+  ext = (ext || "").toLowerCase();
+  if (ext === "pdf") return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="#ff5d9e" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>`;
+  if (["doc", "docx"].includes(ext)) return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  return `<svg class="file-card-icon" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+}
+
+async function fetchAgentHistory(sessionId) {
+  currentSessionId = sessionId;
+  try {
+    const res = await fetch(`/api/agent/history?session_id=${sessionId}`);
+    const data = await res.json();
+    if (data.ok) {
+      renderChatMessages(data.messages);
+    }
+  } catch (e) {
+    console.error("Fetch history error:", e);
+  }
+}
+
+function renderChatMessages(messages) {
+  const historyContainer = document.getElementById("chatHistory");
+  if (!historyContainer) return;
+  historyContainer.innerHTML = "";
+
+  (messages || []).forEach(msg => {
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `message ${msg.role === 'user' ? 'sent' : 'received'}`;
+
+    if (msg.role === 'assistant') {
+      const avatarWrapper = document.createElement("div");
+      avatarWrapper.className = "msg-avatar-wrapper";
+      avatarWrapper.innerHTML = `<img src="${agentAvatarDataUrl || '/static/cx_study_pet.jpg'}" class="msg-pet-avatar">`;
+      messageDiv.appendChild(avatarWrapper);
+    }
+
+    const contentWrapper = document.createElement("div");
+    contentWrapper.className = "msg-content-wrapper";
+
+    const bubbleDiv = document.createElement("div");
+    bubbleDiv.className = "msg-bubble";
+
+    let bubbleContent = parseAgentMarkdown(msg.content);
+    if (msg.attachment_filename) {
+      const ext = msg.attachment_filename.split('.').pop().toLowerCase();
+      const isImg = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+      if (isImg) {
+        bubbleContent = `
+          <div class="attachment-preview">
+            <div class="image-placeholder tex2jax_ignore" style="padding:6px; text-align:center;">
+              <img src="/media/full/${msg.attachment_filename}" style="max-width:100%; max-height:140px; border-radius:6px;">
+            </div>
+            <div class="attachment-info">
+              <span class="file-name">${msg.attachment_filename}</span>
+              <span class="file-size">${msg.attachment_size}</span>
+            </div>
+          </div>
+        ` + bubbleContent;
+      } else {
+        bubbleContent = `
+          <div class="attachment-preview non-image">
+            <div class="file-download-card">
+              <div class="file-icon-box">${getFileIconSvg(ext)}</div>
+              <div class="file-text-box">
+                <span class="file-name">${msg.attachment_filename}</span>
+                <span class="file-size">${msg.attachment_size}</span>
+              </div>
+            </div>
+          </div>
+        ` + bubbleContent;
+      }
+    }
+
+    bubbleDiv.innerHTML = bubbleContent;
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "msg-time";
+    timeSpan.textContent = msg.created_at ? msg.created_at.split(" ")[1] || msg.created_at : "刚刚";
+
+    contentWrapper.appendChild(bubbleDiv);
+    contentWrapper.appendChild(timeSpan);
+    messageDiv.appendChild(contentWrapper);
+    historyContainer.appendChild(messageDiv);
+  });
+
+  historyContainer.scrollTo({ top: historyContainer.scrollHeight, behavior: "smooth" });
+
+  if (window.MathJax && window.MathJax.typesetPromise) {
+    window.MathJax.typesetPromise([historyContainer]).catch(err => console.error("MathJax err:", err));
+  }
+}
+
+async function handleAgentSend(text) {
+  if (!text.trim() && !uploadedFileUrl) return;
+
+  const chatInput = document.getElementById("chatInput");
+  const contextSelect = document.getElementById("contextSelect");
+  const taskId = contextSelect ? contextSelect.value : "";
+  const historyContainer = document.getElementById("chatHistory");
+
+  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // 插入用户暂态消息
+  const userMsgDiv = document.createElement("div");
+  userMsgDiv.className = "message sent";
+  
+  let bubbleContent = parseAgentMarkdown(text);
+  if (uploadedFileUrl) {
+    bubbleContent = `
+      <div class="attachment-preview">
+        <div class="file-download-card">
+          <div class="file-icon-box">${getFileIconSvg(uploadedFileName.split('.').pop())}</div>
+          <div class="file-text-box">
+            <span class="file-name">${uploadedFileName}</span>
+            <span class="file-size">${uploadedFileSizeStr}</span>
+          </div>
+        </div>
+      </div>
+    ` + bubbleContent;
+  }
+
+  userMsgDiv.innerHTML = `
+    <div class="msg-content-wrapper">
+      <div class="msg-bubble">${bubbleContent}</div>
+      <span class="msg-time">${nowStr}</span>
+    </div>
+  `;
+  historyContainer.appendChild(userMsgDiv);
+  if (chatInput) chatInput.value = "";
+
+  // 显示 AI 正在输入指示器
+  const typingDiv = document.createElement("div");
+  typingDiv.className = "message received";
+  typingDiv.id = "agentTypingTemp";
+  typingDiv.innerHTML = `
+    <div class="msg-avatar-wrapper"><img src="${agentAvatarDataUrl || '/static/cx_study_pet.jpg'}" class="msg-pet-avatar"></div>
+    <div class="msg-content-wrapper">
+      <div class="msg-bubble" style="padding:10px 14px;"><span class="pulse-dot"></span> 思考推导中...</div>
+    </div>
+  `;
+  historyContainer.appendChild(typingDiv);
+  historyContainer.scrollTo({ top: historyContainer.scrollHeight, behavior: "smooth" });
+
+  const payload = {
+    message: text,
+    session_id: currentSessionId,
+    task_id: taskId,
+    attachment_name: uploadedFileName,
+    attachment_size: uploadedFileSizeStr
+  };
+
+  // 发送后清空附件暂存
+  uploadedFileUrl = "";
+  uploadedFileName = "";
+  uploadedFileSizeStr = "";
+  const previewContainer = document.getElementById("uploadPreviewContainer");
+  if (previewContainer) previewContainer.style.display = "none";
+
+  try {
+    const res = await fetch("/api/agent/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    
+    if (typingDiv) typingDiv.remove();
+
+    if (data.ok) {
+      const aiMsgDiv = document.createElement("div");
+      aiMsgDiv.className = "message received";
+      aiMsgDiv.innerHTML = `
+        <div class="msg-avatar-wrapper"><img src="${agentAvatarDataUrl || '/static/cx_study_pet.jpg'}" class="msg-pet-avatar"></div>
+        <div class="msg-content-wrapper">
+          <div class="msg-bubble">${parseAgentMarkdown(data.reply)}</div>
+          <span class="msg-time">${nowStr}</span>
+        </div>
+      `;
+      historyContainer.appendChild(aiMsgDiv);
+      historyContainer.scrollTo({ top: historyContainer.scrollHeight, behavior: "smooth" });
+
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise([aiMsgDiv]).catch(err => console.error(err));
+      }
+    }
+  } catch (e) {
+    if (typingDiv) typingDiv.remove();
+    console.error("Chat API error:", e);
+  }
+}
+
+function parseAgentMarkdown(text) {
+  if (!text) return "";
+  let html = text;
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/`(.*?)`/g, "<code>$1</code>");
+  return html;
+}
+
+const mockSessions = [
+  { id: "physics", title: "物理：斜面体与摩擦力分析", date: "今天", tag: "物理", preview: "根据牛顿第二定律公式 a = g(sinθ - μcosθ)..." },
+  { id: "math", title: "数学：高二函数与导数探究", date: "昨天", tag: "数学", preview: "对曲线方程求导得到 y' = 3x² - 4x..." },
+  { id: "chemistry", title: "化学：同分异构体分类卡", date: "前天", tag: "化学", preview: "有机化学同分异构体主要包含碳链与官能团异构..." }
+];
+
+function renderHistoryListUI() {
+  const historyList = document.getElementById("historyList");
+  if (!historyList) return;
+  historyList.innerHTML = "";
+
+  mockSessions.forEach(session => {
+    const item = document.createElement("div");
+    item.className = `history-item ${session.id === currentSessionId ? 'active' : ''}`;
+    item.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12.5px; font-weight:700; color:#fff;">${session.title}</span>
+        <span style="font-size:10px; color:#64748b;">${session.date}</span>
+      </div>
+      <div style="font-size:11px; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${session.preview}</div>
+    `;
+    item.addEventListener("click", () => {
+      currentSessionId = session.id;
+      const historyOverlay = document.getElementById("historyOverlay");
+      if (historyOverlay) historyOverlay.classList.remove("is-open");
+      fetchAgentHistory(session.id);
+    });
+    historyList.appendChild(item);
+  });
+}
+
+function filterHistoryList(query) {
+  const historyList = document.getElementById("historyList");
+  if (!historyList) return;
+  const filtered = mockSessions.filter(s => s.title.toLowerCase().includes(query) || s.preview.toLowerCase().includes(query));
+  historyList.innerHTML = "";
+  filtered.forEach(session => {
+    const item = document.createElement("div");
+    item.className = `history-item ${session.id === currentSessionId ? 'active' : ''}`;
+    item.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12.5px; font-weight:700; color:#fff;">${session.title}</span>
+        <span style="font-size:10px; color:#64748b;">${session.date}</span>
+      </div>
+      <div style="font-size:11px; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${session.preview}</div>
+    `;
+    item.addEventListener("click", () => {
+      currentSessionId = session.id;
+      const historyOverlay = document.getElementById("historyOverlay");
+      if (historyOverlay) historyOverlay.classList.remove("is-open");
+      fetchAgentHistory(session.id);
+    });
+    historyList.appendChild(item);
+  });
+}

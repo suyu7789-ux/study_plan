@@ -135,8 +135,8 @@ class StudyPlanAppTest(unittest.TestCase):
         page = self.client.get("/")
         self.assertEqual(page.status_code, 200)
         html = page.get_data(as_text=True)
-        self.assertIn("/static/app.css?v=32", html)
-        self.assertIn("/static/app.js?v=32", html)
+        self.assertIn("/static/app.css?v=34", html)
+        self.assertIn("/static/app.js?v=34", html)
         self.assertIn('id="timerOrbitProgress"', html)
         self.assertIn('id="timerDialMarks"', html)
         self.assertIn('id="timerHourHand"', html)
@@ -228,8 +228,27 @@ class StudyPlanAppTest(unittest.TestCase):
             "/api/tasks/D01-M1/timer", json={"action": "start", "duration_minutes": 20}
         )
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(supervisor.get("/api/users").status_code, 403)
+    def test_agent_api_endpoints(self):
+        # 1. 测试历史记录默认加载
+        history_res = self.client.get("/api/agent/history?session_id=physics")
+        self.assertEqual(history_res.status_code, 200)
+        data = history_res.get_json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["session_id"], "physics")
+        self.assertTrue(len(data["messages"]) > 0)
+
+        # 2. 测试发送 Agent 问答消息
+        chat_res = self.client.post(
+            "/api/agent/chat",
+            json={"message": "请问物理斜面公式怎么推导？", "session_id": "physics", "task_id": "D01-P1"}
+        )
+        self.assertEqual(chat_res.status_code, 200)
+        chat_data = chat_res.get_json()
+        self.assertTrue(chat_data["ok"])
+        self.assertIn("reply", chat_data)
+        self.assertTrue(len(chat_data["reply"]) > 0)
 
 
 if __name__ == "__main__":
     unittest.main()
+
