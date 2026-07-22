@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b101b">
   <title>长夏学程</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='10') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='40') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='41') }}">
   <script src="{{ url_for('static', filename='vendor/lucide.min.js', v='4') }}" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
@@ -19,7 +19,7 @@
   <script>
     window.APP_USER = {{ {"role": role, "displayName": display_name, "username": username, "canManageUsers": can_manage_users}|tojson }};
   </script>
-  <script src="{{ url_for('static', filename='app.js', v='40') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v='41') }}" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -178,9 +178,14 @@
           <label>账号<input name="username" autocomplete="off" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]+" required></label>
           <label>显示名称<input name="display_name" autocomplete="off" maxlength="24" required></label>
           <label>角色
-            <select name="role" required>
+            <select name="role" id="createRole" required>
               <option value="student">学生</option>
               <option value="supervisor">监督者</option>
+            </select>
+          </label>
+          <label>绑定监督人
+            <select name="supervisor_username" id="createSupervisorUsername">
+              <option value="">未指定 (暂无)</option>
             </select>
           </label>
           <label>初始密码<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
@@ -209,7 +214,11 @@
             <option value="supervisor">监督者</option>
           </select>
         </label>
-        <label>关联监督者账号<input name="supervisor_username" id="editSupervisorUsername" placeholder="可填对应的监督者账号" autocomplete="off"></label>
+        <label>绑定监督人
+          <select name="supervisor_username" id="editSupervisorUsername">
+            <option value="">未指定 (暂无)</option>
+          </select>
+        </label>
         <label>重置密码 (留空则不修改)<input name="password" id="editPassword" type="password" autocomplete="new-password" minlength="10" placeholder="若无需重置，请保持留空"></label>
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
           <button class="secondary-button" type="button" data-close-modal="editUserModal">取消</button>

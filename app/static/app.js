@@ -952,12 +952,24 @@ function closeEvidenceGuides(except = null) {
 
 function renderUsers(users) {
   document.getElementById("userCount").textContent = `${users.length} 个`;
+
+  const supervisors = users.filter((u) => u.role === "supervisor" || u.can_manage_users);
+  const supervisorOptions = [
+    '<option value="">未指定 (无监督人)</option>',
+    ...supervisors.map((s) => `<option value="${escapeHtml(s.username)}">${escapeHtml(s.display_name)} (${escapeHtml(s.username)})</option>`)
+  ].join("");
+
+  const createSelect = document.getElementById("createSupervisorUsername");
+  const editSelect = document.getElementById("editSupervisorUsername");
+  if (createSelect) createSelect.innerHTML = supervisorOptions;
+  if (editSelect) editSelect.innerHTML = supervisorOptions;
+
   document.getElementById("userList").innerHTML = users.map((user) => `
     <div class="user-list-item">
       <span class="user-avatar ${user.role}">${escapeHtml(user.display_name.slice(0, 1).toUpperCase())}</span>
       <span class="user-list-identity">
         <strong>${escapeHtml(user.display_name)}</strong>
-        <small>${escapeHtml(user.username)}</small>
+        <small>${escapeHtml(user.username)}${user.role === "student" && user.supervisor_username ? ` · 监督人: ${escapeHtml(user.supervisor_username)}` : ""}</small>
       </span>
       <span class="user-role ${user.role}">${user.role === "student" ? "学生" : "监督者"}</span>
       ${user.can_manage_users ? `<span class="user-admin-mark" title="账号管理员"><i data-lucide="shield-check"></i></span>` : ""}
@@ -1271,6 +1283,7 @@ if (canManageUsers) {
           username: form.get("username"),
           display_name: form.get("display_name"),
           role: form.get("role"),
+          supervisor_username: form.get("supervisor_username") || "",
           password: form.get("password"),
         }),
       });
@@ -1415,6 +1428,11 @@ let agentAvatarDataUrl = "";
 function initAgentPet() {
   const container = document.getElementById("webglContainer");
   if (!container) return;
+
+  if (typeof THREE === "undefined" || !window.THREE) {
+    setTimeout(initAgentPet, 100);
+    return;
+  }
 
   agentThreeScene = new THREE.Scene();
   agentCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);

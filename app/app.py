@@ -161,29 +161,37 @@ def ensure_user_tasks(db, username):
 def get_active_student_username(db):
     user_role = session.get("role")
     current_user = session.get("username")
+    can_manage = session.get("can_manage_users", False)
+
     if user_role == "student":
         return current_user
 
     requested_student = request.args.get("student")
     if requested_student:
-        student_row = db.execute(
-            "SELECT username FROM users WHERE username = ? AND role = 'student'",
-            (requested_student,)
-        ).fetchone()
+        if can_manage:
+            student_row = db.execute(
+                "SELECT username FROM users WHERE username = ? AND role = 'student'",
+                (requested_student,)
+            ).fetchone()
+        else:
+            student_row = db.execute(
+                "SELECT username FROM users WHERE username = ? AND role = 'student' AND (supervisor_username = ? OR supervisor_username = '' OR supervisor_username IS NULL)",
+                (requested_student, current_user)
+            ).fetchone()
         if student_row:
             return student_row["username"]
 
-    supervised_student = db.execute(
-        "SELECT username FROM users WHERE role = 'student' AND (supervisor_username = ? OR supervisor_username = '' OR supervisor_username IS NULL) ORDER BY username ASC",
-        (current_user,)
-    ).fetchone()
-    if supervised_student:
-        return supervised_student["username"]
+    if can_manage:
+        supervised_student = db.execute(
+            "SELECT username FROM users WHERE role = 'student' ORDER BY username ASC"
+        ).fetchone()
+    else:
+        supervised_student = db.execute(
+            "SELECT username FROM users WHERE role = 'student' AND (supervisor_username = ? OR supervisor_username = '' OR supervisor_username IS NULL) ORDER BY username ASC",
+            (current_user,)
+        ).fetchone()
 
-    any_student = db.execute(
-        "SELECT username FROM users WHERE role = 'student' ORDER BY username ASC"
-    ).fetchone()
-    return any_student["username"] if any_student else current_user
+    return supervised_student["username"] if supervised_student else current_user
 
 
 def init_db():
@@ -574,8 +582,6 @@ def create_user():
     password = str(payload.get("password", ""))
     role = payload.get("role")
     supervisor_username = str(payload.get("supervisor_username", "")).strip()
-    if not supervisor_username and role == "student":
-        supervisor_username = session["username"] if session["role"] == "supervisor" else ""
 
     if not re.fullmatch(r"[A-Za-z0-9._-]{3,32}", username):
         return jsonify({"error": "账号需为3至32位字母、数字、点、下划线或短横线"}), 400
@@ -690,7 +696,7 @@ def list_supervised_students():
             rows = db.execute(
                 """
                 SELECT username, display_name, supervisor_username, created_at
-                FROM users WHERE role = 'student' AND (supervisor_username = ? OR supervisor_username = '' OR supervisor_username IS NULL)
+                FROM users WHERE role = 'student' AND supervisor_username = ?
                 ORDER BY username
                 """,
                 (current_user,)
