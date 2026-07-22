@@ -1511,7 +1511,7 @@ function initAgentPet() {
       e.stopPropagation();
       if (petDragState.hasMoved) {
         petDragState.hasMoved = false;
-        return; // 拖拽移动释放后不视为常规点击
+        return;
       }
       toggleAgentDrawer();
       triggerPetRaycast(e);
@@ -1519,6 +1519,188 @@ function initAgentPet() {
 
     initPetDrag();
   }
+}
+
+function animateAgent3D() {
+  requestAnimationFrame(animateAgent3D);
+  const time = Date.now() * 0.0015;
+
+  if (!agentIsJumping) {
+    currentY = 0.22 + Math.sin(time * 1.5) * 0.08;
+    agentRobotGroup.position.y = currentY;
+  } else {
+    agentJumpTime += 0.05;
+    if (agentJumpTime >= Math.PI) {
+      agentIsJumping = false;
+      agentRobotGroup.position.y = currentY;
+    } else {
+      agentRobotGroup.position.y = currentY + Math.sin(agentJumpTime) * 1.3;
+      agentRobotGroup.rotation.x = agentJumpTime * 2;
+    }
+  }
+
+  const targetRotY = agentMouse.x * 0.45;
+  const targetRotX = -agentMouse.y * 0.3;
+
+  if (agentHeadNudgeTimer <= 0) {
+    agentHead.rotation.y += (targetRotY - agentHead.rotation.y) * 0.12;
+    agentHead.rotation.x += (targetRotX - agentHead.rotation.x) * 0.12;
+    agentHead.rotation.z += (0 - agentHead.rotation.z) * 0.1;
+  }
+  agentBody.rotation.y += (targetRotY * 0.25 - agentBody.rotation.y) * 0.1;
+
+  let eyeScaleX = 1.0;
+  let eyeScaleY = 1.25;
+
+  if (agentIsHovered) {
+    agentHoverTime += 0.016;
+    if (agentHoverTime < 0.6) {
+      const wink = Math.sin(agentHoverTime * Math.PI * 2 / 0.3);
+      if (wink < 0) eyeScaleY = 0.08;
+    } else {
+      eyeScaleX = 1.25 + Math.sin(time * 10) * 0.06;
+      eyeScaleY = 1.25 + Math.sin(time * 10) * 0.06;
+    }
+    agentBlushMaterial.emissiveIntensity = 3.2;
+    agentLeftEar.rotation.z += (1.0 - agentLeftEar.rotation.z) * 0.15;
+    agentRightEar.rotation.z += (-1.0 - agentRightEar.rotation.z) * 0.15;
+  } else {
+    agentHoverTime = 0;
+    agentBlushMaterial.emissiveIntensity = 1.5;
+    agentLeftEar.rotation.z += (0.45 - agentLeftEar.rotation.z) * 0.12;
+    agentRightEar.rotation.z += (-0.45 - agentRightEar.rotation.z) * 0.12;
+  }
+
+  if (agentEarTwitchTimer > 0) {
+    agentEarTwitchTimer -= 0.016;
+    const twitch = Math.sin(Date.now() * 0.09) * 0.28;
+    agentLeftEar.rotation.z = (agentIsHovered ? 1.0 : 0.45) + twitch;
+    agentRightEar.rotation.z = (agentIsHovered ? -1.0 : -0.45) - twitch;
+  }
+
+  if (agentHeadNudgeTimer > 0) {
+    agentHeadNudgeTimer -= 0.016;
+    agentHead.rotation.z = Math.sin(agentHeadNudgeTimer * Math.PI * 4.0) * 0.24;
+    agentHead.rotation.x = Math.abs(Math.sin(agentHeadNudgeTimer * Math.PI * 2.0)) * 0.12;
+  }
+
+  let finalEyeY = eyeScaleY;
+  if (!agentIsHovered) {
+    if ((time % 4) > 3.8) finalEyeY = 0.08;
+  }
+  agentLeftEye.scale.set(eyeScaleX, finalEyeY, 0.5);
+  agentRightEye.scale.set(eyeScaleX, finalEyeY, 0.5);
+
+  agentBaseRingCurrentSpin += (agentBaseRingTargetSpin - agentBaseRingCurrentSpin) * 0.08;
+  agentBaseRing.rotation.z -= agentBaseRingCurrentSpin;
+  if (agentBaseRingTargetSpin > 0.015) agentBaseRingTargetSpin -= 0.003;
+
+  agentBadgeCurrentScale += (agentBadgeTargetScale - agentBadgeCurrentScale) * 0.12;
+  agentBadge.scale.set(agentBadgeCurrentScale, agentBadgeCurrentScale, agentBadgeCurrentScale * 0.45);
+  if (agentBadgeTargetScale > 1.0) {
+    agentBadgeMaterial.color.setHex(0xffffff);
+    agentBadgeMaterial.emissive.setHex(0xffffff);
+    agentBadgeMaterial.emissiveIntensity = 8.0;
+    agentBadgeTargetScale -= 0.035;
+  } else {
+    agentBadgeMaterial.color.setHex(0x2dd4bf);
+    agentBadgeMaterial.emissive.setHex(0x2dd4bf);
+    agentBadgeMaterial.emissiveIntensity = 2.5;
+  }
+
+  agentBadgeLightCurrentIntensity += (agentBadgeLightTargetIntensity - agentBadgeLightCurrentIntensity) * 0.12;
+  agentBadgeLight.intensity = agentBadgeLightCurrentIntensity;
+  if (agentBadgeLightTargetIntensity > 0.0) agentBadgeLightTargetIntensity -= 0.15;
+
+  agentBaseRing.position.y = -1.35 + Math.sin(time * 1.5 - 0.5) * 0.07;
+  agentBaseRingMaterial.emissiveIntensity = (1.6 + Math.sin(time * 3.5) * 0.4) * (agentBaseRingCurrentSpin * 20.0);
+
+  if (!agentIsJumping) {
+    agentRobotGroup.rotation.x += (0 - agentRobotGroup.rotation.x) * 0.1;
+    agentRobotGroup.rotation.y += (0 - agentRobotGroup.rotation.y) * 0.1;
+  }
+
+  agentRenderer.render(agentThreeScene, agentCamera);
+}
+
+function triggerPetRaycast(eventClient) {
+  if (!agentRenderer || !agentCamera) return;
+  const raycaster = new THREE.Raycaster();
+  const mouse3d = new THREE.Vector2();
+  const rect = agentRenderer.domElement.getBoundingClientRect();
+
+  mouse3d.x = ((eventClient.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse3d.y = -((eventClient.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse3d, agentCamera);
+  const intersects = raycaster.intersectObjects(agentRobotGroup.children, true);
+
+  if (intersects.length > 0) {
+    let hitObj = intersects[0].object;
+    if (hitObj.parent === agentBaseRing) hitObj = agentBaseRing;
+
+    if (hitObj === agentLeftEar || hitObj === agentRightEar || hitObj === agentLeftEarCollider || hitObj === agentRightEarCollider) {
+      agentEarTwitchTimer = 1.2;
+      triggerSpeechBubble(["喵呜～捏捏猫耳，精力拉满！😸", "耳朵竖起来听你说话呢！👂"]);
+    } else if (hitObj === agentHead) {
+      agentHeadNudgeTimer = 1.0;
+      triggerSpeechBubble(["摸摸猫头，专注度爆发！✨", "好舒服～加油自习哦！😸"]);
+    } else if (hitObj === agentBadge) {
+      agentBadgeTargetScale = 1.8;
+      agentBadgeLightTargetIntensity = 5.0;
+      triggerSpeechBubble(["CX 核心充能 100%！⚡", "爆发出巨大的专注能量！🔥"]);
+    } else if (hitObj === agentBaseRing) {
+      agentBaseRingTargetSpin = 0.25;
+      triggerSpeechBubble(["反重力发动机超载！🚀", "要飞往星辰大海啦！✨"]);
+    } else {
+      triggerAgentJump();
+      for (let i = 0; i < 3; i++) spawnFloatingHeart();
+    }
+  } else {
+    triggerAgentJump();
+    for (let i = 0; i < 3; i++) spawnFloatingHeart();
+  }
+}
+
+function triggerAgentJump() {
+  if (agentIsJumping) return;
+  agentIsJumping = true;
+  agentJumpTime = 0;
+}
+
+let speechTimer = null;
+function triggerSpeechBubble(speechList) {
+  const speechBubble = document.getElementById("petSpeechBubble");
+  if (!speechBubble) return;
+  if (speechTimer) clearTimeout(speechTimer);
+
+  const text = speechList[Math.floor(Math.random() * speechList.length)];
+  speechBubble.textContent = text;
+  speechBubble.classList.add("is-visible");
+
+  speechTimer = setTimeout(() => {
+    speechBubble.classList.remove("is-visible");
+  }, 4000);
+}
+
+function spawnFloatingHeart() {
+  const container = document.getElementById("desktopPetContainer");
+  if (!container) return;
+  const heart = document.createElement("div");
+  heart.className = "floating-heart";
+  heart.innerHTML = "♥";
+
+  const startX = Math.random() * 40 + 30;
+  const dx = (Math.random() - 0.5) * 60;
+  const duration = 0.8 + Math.random() * 0.5;
+
+  heart.style.left = `${startX}px`;
+  heart.style.bottom = "40px";
+  heart.style.setProperty("--dx", `${dx}px`);
+  heart.style.setProperty("--duration", `${duration}s`);
+
+  container.appendChild(heart);
+  setTimeout(() => heart.remove(), duration * 1000);
 }
 
 let petDragState = {
@@ -1561,7 +1743,7 @@ function initPetDrag() {
     const dx = clientX - petDragState.startX;
     const dy = clientY - petDragState.startY;
 
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
       petDragState.hasMoved = true;
     }
 
