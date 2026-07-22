@@ -108,7 +108,7 @@ def ensure_user_tasks(db, username):
         now = now_text()
         db.executemany(
             """
-            INSERT INTO tasks (
+            INSERT OR IGNORE INTO tasks (
                 username, id, date, day, week, subject, category, source, section,
                 detail, output_standard, planned_minutes, min_images,
                 status, student_note, supervisor_status,
@@ -266,6 +266,63 @@ def init_db():
                 db.execute("ALTER TABLE tasks ADD COLUMN username TEXT NOT NULL DEFAULT 'student'")
             except sqlite3.OperationalError:
                 pass
+
+        pk_columns = [row["name"] for row in db.execute("PRAGMA table_info(tasks)").fetchall() if row["pk"] > 0]
+        if pk_columns == ["id"]:
+            old_cols = {row["name"] for row in db.execute("PRAGMA table_info(tasks)").fetchall()}
+            user_expr = "username" if "username" in old_cols else "'student'"
+            timer_target_expr = "timer_target_seconds" if "timer_target_seconds" in old_cols else "0"
+            timer_elapsed_expr = "timer_elapsed_seconds" if "timer_elapsed_seconds" in old_cols else "0"
+            timer_started_expr = "timer_started_at" if "timer_started_at" in old_cols else "NULL"
+            timer_state_expr = "timer_state" if "timer_state" in old_cols else "'idle'"
+
+            db.execute("ALTER TABLE tasks RENAME TO tasks_old")
+            db.executescript(
+                """
+                CREATE TABLE tasks (
+                    username TEXT NOT NULL DEFAULT 'student',
+                    id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    day INTEGER NOT NULL,
+                    week INTEGER NOT NULL,
+                    subject TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    section TEXT NOT NULL,
+                    detail TEXT NOT NULL,
+                    output_standard TEXT NOT NULL,
+                    planned_minutes INTEGER NOT NULL,
+                    min_images INTEGER NOT NULL,
+                    status TEXT NOT NULL DEFAULT '未开始',
+                    student_note TEXT NOT NULL DEFAULT '',
+                    supervisor_status TEXT NOT NULL DEFAULT '待审核',
+                    supervisor_comment TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL,
+                    timer_target_seconds INTEGER NOT NULL DEFAULT 0,
+                    timer_elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+                    timer_started_at TEXT,
+                    timer_state TEXT NOT NULL DEFAULT 'idle',
+                    PRIMARY KEY (username, id)
+                );
+                """
+            )
+            db.execute(
+                f"""
+                INSERT OR IGNORE INTO tasks (
+                    username, id, date, day, week, subject, category, source, section, detail,
+                    output_standard, planned_minutes, min_images, status, student_note,
+                    supervisor_status, supervisor_comment, updated_at,
+                    timer_target_seconds, timer_elapsed_seconds, timer_started_at, timer_state
+                )
+                SELECT
+                    COALESCE({user_expr}, 'student'), id, date, day, week, subject, category, source, section, detail,
+                    output_standard, planned_minutes, min_images, status, student_note,
+                    supervisor_status, supervisor_comment, updated_at,
+                    COALESCE({timer_target_expr}, 0), COALESCE({timer_elapsed_expr}, 0), {timer_started_expr}, COALESCE({timer_state_expr}, 'idle')
+                FROM tasks_old
+                """
+            )
+            db.execute("DROP TABLE tasks_old")
 
         image_columns = {row["name"] for row in db.execute("PRAGMA table_info(images)")}
         if "username" not in image_columns:
