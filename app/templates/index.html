@@ -58,6 +58,14 @@
           <div><span class="section-kicker" id="pageKicker">DAILY PLAN</span><h1 id="pageTitle">我的课程 | 任务列表</h1></div>
         </div>
         <div class="topbar-meta">
+          {% if role == 'supervisor' or can_manage_users %}
+          <div class="student-select-container" id="supervisorStudentContainer" style="display: inline-flex; align-items: center; gap: 6px; margin-right: 8px;">
+            <label for="supervisorStudentSelect" style="font-size: 12px; color: #94a3b8; font-weight: 600;">审阅学生:</label>
+            <select id="supervisorStudentSelect" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 6px; padding: 4px 10px; font-size: 12.5px; outline: none; cursor: pointer;">
+              <option value="">加载中...</option>
+            </select>
+          </div>
+          {% endif %}
           <span class="plan-period"><i data-lucide="calendar-days"></i>2026.07.16–08.26</span>
           <span class="role-badge">{{ '监督者' if role == 'supervisor' else '学生' }}</span>
         </div>
@@ -184,6 +192,30 @@
           <div class="user-list" id="userList"></div>
         </section>
       </div>
+    </div>
+  <div class="modal-backdrop" id="editUserModal" hidden>
+    <div class="user-management-dialog" role="dialog" aria-modal="true" aria-labelledby="editUserTitle" style="max-width: 440px;">
+      <div class="dialog-header">
+        <div><span class="section-kicker">ACCOUNTS</span><h2 id="editUserTitle">编辑账号</h2></div>
+        <button class="icon-button" type="button" data-close-modal="editUserModal" title="关闭" aria-label="关闭编辑账号"><i data-lucide="x"></i></button>
+      </div>
+      <form id="editUserForm" class="user-create-form" style="padding: 16px 0;">
+        <input type="hidden" name="username" id="editUsername">
+        <label>账号<input id="editUsernameDisplay" readonly style="opacity: 0.7; cursor: not-allowed;"></label>
+        <label>显示名称<input name="display_name" id="editDisplayName" autocomplete="off" maxlength="24" required></label>
+        <label>角色
+          <select name="role" id="editRole" required>
+            <option value="student">学生</option>
+            <option value="supervisor">监督者</option>
+          </select>
+        </label>
+        <label>关联监督者账号<input name="supervisor_username" id="editSupervisorUsername" placeholder="可填对应的监督者账号" autocomplete="off"></label>
+        <label>重置密码 (留空则不修改)<input name="password" id="editPassword" type="password" autocomplete="new-password" minlength="10" placeholder="若无需重置，请保持留空"></label>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
+          <button class="secondary-button" type="button" data-close-modal="editUserModal">取消</button>
+          <button class="primary-button" type="submit"><i data-lucide="save"></i><span>保存修改</span></button>
+        </div>
+      </form>
     </div>
   </div>
   {% endif %}

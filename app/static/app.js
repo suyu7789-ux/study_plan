@@ -3,6 +3,7 @@ const state = {
   tasks: [],
   selectedDate: null,
   selectedSubject: "全部",
+  selectedStudent: "",
   activeTimerTask: null,
   timerFinishing: false,
   expandedTasks: new Set(),
@@ -595,8 +596,37 @@ function formatClock(totalSeconds) {
     : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+async function initSupervisorStudentSelector() {
+  const container = document.getElementById("supervisorStudentContainer");
+  const select = document.getElementById("supervisorStudentSelect");
+  if (!container || !select) return;
+
+  try {
+    const res = await api("/api/supervisor/students");
+    if (res.ok && res.students && res.students.length > 0) {
+      select.innerHTML = res.students.map(s => `<option value="${escapeHtml(s.username)}">${escapeHtml(s.display_name)} (${escapeHtml(s.username)})</option>`).join("");
+      state.selectedStudent = res.students[0].username;
+
+      select.addEventListener("change", async (e) => {
+        state.selectedStudent = e.target.value;
+        await loadSummary();
+        await loadTasks();
+        toast(`已切换审阅学生: ${state.selectedStudent}`);
+      });
+    } else {
+      select.innerHTML = '<option value="">暂无学生</option>';
+    }
+  } catch (err) {
+    console.error("加载监督学生失败:", err);
+  }
+}
+
 async function loadSummary() {
-  state.summary = await api("/api/summary");
+  let url = "/api/summary";
+  if (state.selectedStudent) {
+    url += `?student=${encodeURIComponent(state.selectedStudent)}`;
+  }
+  state.summary = await api(url);
   const dates = state.summary.dates;
   const today = state.summary.today;
   if (!state.selectedDate) {
@@ -618,6 +648,7 @@ async function loadSummary() {
 async function loadTasks() {
   const parameters = new URLSearchParams({ date: state.selectedDate });
   if (state.selectedSubject !== "全部") parameters.set("subject", state.selectedSubject);
+  if (state.selectedStudent) parameters.set("student", state.selectedStudent);
   state.tasks = (await api(`/api/tasks?${parameters}`)).map(syncTimerTask);
   renderTasks();
 }
@@ -929,8 +960,27 @@ function renderUsers(users) {
       </span>
       <span class="user-role ${user.role}">${user.role === "student" ? "学生" : "监督者"}</span>
       ${user.can_manage_users ? `<span class="user-admin-mark" title="账号管理员"><i data-lucide="shield-check"></i></span>` : ""}
+      <button class="icon-button edit-user-button" data-user='${escapeHtml(JSON.stringify(user))}' title="编辑账号" style="margin-left: auto; width: 32px; height: 32px; border-radius: 8px;"><i data-lucide="pencil"></i></button>
     </div>
   `).join("");
+  
+  document.querySelectorAll(".edit-user-button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      try {
+        const uData = JSON.parse(btn.dataset.user);
+        document.getElementById("editUsername").value = uData.username;
+        document.getElementById("editUsernameDisplay").value = uData.username;
+        document.getElementById("editDisplayName").value = uData.display_name;
+        document.getElementById("editRole").value = uData.role;
+        document.getElementById("editSupervisorUsername").value = uData.supervisor_username || "";
+        document.getElementById("editPassword").value = "";
+        document.getElementById("editUserModal").hidden = false;
+      } catch (err) {
+        console.error("解析用户数据失败:", err);
+      }
+    });
+  });
+  
   refreshIcons();
 }
 
@@ -1232,6 +1282,41 @@ if (canManageUsers) {
       submitButton.disabled = false;
     }
   });
+
+  const editUserForm = document.getElementById("editUserForm");
+  if (editUserForm) {
+    editUserForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.target);
+      const username = form.get("username");
+      const submitButton = event.target.querySelector("button[type='submit']");
+      submitButton.disabled = true;
+      try {
+        const payload = {
+          display_name: form.get("display_name"),
+          role: form.get("role"),
+          supervisor_username: form.get("supervisor_username"),
+        };
+        const pass = form.get("password");
+        if (pass && pass.trim()) {
+          payload.password = pass;
+        }
+
+        await api(`/api/users/${encodeURIComponent(username)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        document.getElementById("editUserModal").hidden = true;
+        await loadUsers();
+        toast("账号资料已更新");
+      } catch (error) {
+        toast(error.message, "error");
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  }
 }
 
 document.getElementById("passwordForm").addEventListener("submit", async (event) => {
@@ -1273,6 +1358,7 @@ document.addEventListener("keydown", (event) => {
 
 async function start() {
   try {
+    await initSupervisorStudentSelector();
     await loadSummary();
     await loadTasks();
     await restoreActiveTimer();
@@ -2192,6 +2278,7 @@ function parseAgentMarkdown(text) {
   let html = text;
   html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/`(.*?)`/g, "<code>$1</code>");
+  html = html.replace(/\n/g, "<br>");
   return html;
 }
 

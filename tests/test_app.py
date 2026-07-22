@@ -248,6 +248,88 @@ class StudyPlanAppTest(unittest.TestCase):
         self.assertIn("reply", chat_data)
         self.assertTrue(len(chat_data["reply"]) > 0)
 
+    def test_multi_student_task_isolation_and_supervisor_switching(self):
+        # 1. student 完成任务 D01-M1
+        self.client.patch("/api/tasks/D01-M1", json={"status": "已完成", "student_note": "学生A完成"})
+        
+        # 2. 创建新学生 student_b
+        admin = app.test_client()
+        admin.post("/login", data={"username": "suyu", "password": "TestAdmin2026!"})
+        admin.post("/api/users", json={
+            "username": "student_b",
+            "display_name": "学生B",
+            "password": "StudentPass2026!",
+            "role": "student"
+        })
+
+        # 3. 验证 student_b 的 D01-M1 任务独立且仍然是 未开始
+        client_b = app.test_client()
+        client_b.post("/login", data={"username": "student_b", "password": "StudentPass2026!"})
+        tasks_b = client_b.get("/api/tasks?date=2026-07-16&subject=数学").get_json()
+        task_b_m1 = next(t for t in tasks_b if t["id"] == "D01-M1")
+        self.assertEqual(task_b_m1["status"], "未开始")
+
+        # 4. 监督者切换审阅不同学生
+        supervisor = app.test_client()
+        supervisor.post("/login", data={"username": "supervisor", "password": "TestSupervisor2026!"})
+        students_res = supervisor.get("/api/supervisor/students").get_json()
+        self.assertTrue(students_res["ok"])
+        
+        tasks_sup_a = supervisor.get("/api/tasks?date=2026-07-16&subject=数学&student=student").get_json()
+        self.assertEqual(next(t for t in tasks_sup_a if t["id"] == "D01-M1")["status"], "已完成")
+
+        tasks_sup_b = supervisor.get("/api/tasks?date=2026-07-16&subject=数学&student=student_b").get_json()
+        self.assertEqual(next(t for t in tasks_sup_b if t["id"] == "D01-M1")["status"], "未开始")
+
+    def test_agent_chat_user_isolation(self):
+        # 1. student 发送消息
+        self.client.post("/api/agent/chat", json={"message": "这是学生A的私密提问", "session_id": "physics"})
+
+        # 2. 创建并登录 student_c
+        admin = app.test_client()
+        admin.post("/login", data={"username": "suyu", "password": "TestAdmin2026!"})
+        admin.post("/api/users", json={
+            "username": "student_c",
+            "display_name": "学生C",
+            "password": "StudentPass2026!",
+            "role": "student"
+        })
+        client_c = app.test_client()
+        client_c.post("/login", data={"username": "student_c", "password": "StudentPass2026!"})
+        
+        # 3. 检查 student_c 的 Agent 历史，确保看不到 student 的提问
+        history_c = client_c.get("/api/agent/history?session_id=physics").get_json()
+        messages_content = [m["content"] for m in history_c["messages"]]
+        self.assertNotIn("这是学生A的私密提问", messages_content)
+
+    def test_account_admin_can_edit_user_and_password(self):
+        admin = app.test_client()
+        admin.post("/login", data={"username": "suyu", "password": "TestAdmin2026!"})
+        admin.post("/api/users", json={
+            "username": "user_to_edit",
+            "display_name": "待修改学生",
+            "password": "OldStudentPassword2026!",
+            "role": "student"
+        })
+
+        # 1. 修改 user_to_edit 的显示名称与新密码
+        patch_res = admin.patch(
+            "/api/users/user_to_edit",
+            json={
+                "display_name": "修改后的学生",
+                "password": "NewStudentPassword2026!",
+            },
+        )
+        self.assertEqual(patch_res.status_code, 200)
+
+        # 2. 使用新密码登录 user_to_edit 校验
+        client_new = app.test_client()
+        login_res = client_new.post(
+            "/login",
+            data={"username": "user_to_edit", "password": "NewStudentPassword2026!"},
+        )
+        self.assertEqual(login_res.status_code, 302)
+
 
 if __name__ == "__main__":
     unittest.main()

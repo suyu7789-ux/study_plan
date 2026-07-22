@@ -9,6 +9,7 @@ from pathlib import Path
 
 from flask import (
     Flask,
+    Response,
     abort,
     jsonify,
     redirect,
@@ -16,8 +17,10 @@ from flask import (
     request,
     send_from_directory,
     session,
+    stream_with_context,
     url_for,
 )
+from llm_client import LLMClient
 from PIL import Image, ImageOps
 from pillow_heif import register_heif_opener
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -98,6 +101,91 @@ def timer_elapsed_seconds(task):
     return elapsed
 
 
+def ensure_user_tasks(db, username):
+    count = db.execute("SELECT COUNT(*) FROM tasks WHERE username = ?", (username,)).fetchone()[0]
+    if count == 0:
+        tasks = json.loads(TASKS_PATH.read_text(encoding="utf-8"))
+        now = now_text()
+        db.executemany(
+            """
+            INSERT INTO tasks (
+                username, id, date, day, week, subject, category, source, section,
+                detail, output_standard, planned_minutes, min_images,
+                status, student_note, supervisor_status,
+                supervisor_comment, updated_at,
+                timer_target_seconds, timer_elapsed_seconds, timer_started_at, timer_state
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未开始', '', '待审核', '', ?, ?, 0, NULL, 'idle')
+            """,
+            [
+                (
+                    username, task["id"], task["date"], task["day"], task["week"],
+                    task["subject"], task["category"], task["source"],
+                    task["section"], task["detail"], task["output_standard"],
+                    task["planned_minutes"], task["min_images"], now,
+                    task["planned_minutes"] * 60
+                )
+                for task in tasks
+            ],
+        )
+    else:
+        db.execute(
+            """
+            UPDATE tasks
+            SET source = ?, section = ?, detail = ?, output_standard = ?, planned_minutes = ?
+            WHERE username = ? AND category = '单词背诵'
+            """,
+            (
+                "奶酪单词 App",
+                "每日新学20词",
+                "在奶酪单词 App 完成当日20个新词；按 App 流程完成学习与复习；对未掌握词汇重点复习。",
+                "当日学习完成页显示已完成20词；薄弱词或复习记录清晰可见。",
+                20,
+                username,
+            ),
+        )
+        for category, evidence_items in EVIDENCE_GUIDE.items():
+            db.execute(
+                "UPDATE tasks SET min_images = ? WHERE username = ? AND category = ?",
+                (len(evidence_items), username, category),
+            )
+        db.execute(
+            """
+            UPDATE tasks
+            SET timer_target_seconds = planned_minutes * 60
+            WHERE username = ? AND (timer_target_seconds IS NULL OR timer_target_seconds <= 0)
+            """,
+            (username,),
+        )
+
+
+def get_active_student_username(db):
+    user_role = session.get("role")
+    current_user = session.get("username")
+    if user_role == "student":
+        return current_user
+
+    requested_student = request.args.get("student")
+    if requested_student:
+        student_row = db.execute(
+            "SELECT username FROM users WHERE username = ? AND role = 'student'",
+            (requested_student,)
+        ).fetchone()
+        if student_row:
+            return student_row["username"]
+
+    supervised_student = db.execute(
+        "SELECT username FROM users WHERE role = 'student' AND (supervisor_username = ? OR supervisor_username = '' OR supervisor_username IS NULL) ORDER BY username ASC",
+        (current_user,)
+    ).fetchone()
+    if supervised_student:
+        return supervised_student["username"]
+
+    any_student = db.execute(
+        "SELECT username FROM users WHERE role = 'student' ORDER BY username ASC"
+    ).fetchone()
+    return any_student["username"] if any_student else current_user
+
+
 def init_db():
     with connect_db() as db:
         db.executescript(
@@ -107,12 +195,14 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL CHECK(role IN ('student', 'supervisor')),
                 display_name TEXT NOT NULL,
+                supervisor_username TEXT DEFAULT '',
                 can_manage_users INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL DEFAULT 'student',
+                id TEXT NOT NULL,
                 date TEXT NOT NULL,
                 day INTEGER NOT NULL,
                 week INTEGER NOT NULL,
@@ -128,12 +218,14 @@ def init_db():
                 student_note TEXT NOT NULL DEFAULT '',
                 supervisor_status TEXT NOT NULL DEFAULT '待审核',
                 supervisor_comment TEXT NOT NULL DEFAULT '',
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (username, id)
             );
 
             CREATE TABLE IF NOT EXISTS images (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                username TEXT NOT NULL DEFAULT 'student',
+                task_id TEXT NOT NULL,
                 filename TEXT NOT NULL,
                 thumb_filename TEXT NOT NULL,
                 original_name TEXT NOT NULL,
@@ -143,6 +235,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS agent_chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL DEFAULT 'student',
                 session_id TEXT NOT NULL DEFAULT 'default',
                 role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
                 content TEXT NOT NULL,
@@ -153,24 +246,46 @@ def init_db():
                 created_at TEXT NOT NULL
             );
 
-            CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(date);
-            CREATE INDEX IF NOT EXISTS idx_tasks_subject ON tasks(subject);
-            CREATE INDEX IF NOT EXISTS idx_images_task ON images(task_id);
-            CREATE INDEX IF NOT EXISTS idx_agent_chat_session ON agent_chat_messages(session_id);
+            CREATE INDEX IF NOT EXISTS idx_tasks_user_date ON tasks(username, date);
+            CREATE INDEX IF NOT EXISTS idx_tasks_user_subject ON tasks(username, subject);
+            CREATE INDEX IF NOT EXISTS idx_images_user_task ON images(username, task_id);
+            CREATE INDEX IF NOT EXISTS idx_agent_chat_user_session ON agent_chat_messages(username, session_id);
             """
         )
 
         user_columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
         if "can_manage_users" not in user_columns:
             try:
-                db.execute(
-                    "ALTER TABLE users ADD COLUMN can_manage_users INTEGER NOT NULL DEFAULT 0"
-                )
-            except sqlite3.OperationalError as error:
-                if "duplicate column name" not in str(error).lower():
-                    raise
+                db.execute("ALTER TABLE users ADD COLUMN can_manage_users INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+        if "supervisor_username" not in user_columns:
+            try:
+                db.execute("ALTER TABLE users ADD COLUMN supervisor_username TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass
 
         task_columns = {row["name"] for row in db.execute("PRAGMA table_info(tasks)")}
+        if "username" not in task_columns:
+            try:
+                db.execute("ALTER TABLE tasks ADD COLUMN username TEXT NOT NULL DEFAULT 'student'")
+            except sqlite3.OperationalError:
+                pass
+
+        image_columns = {row["name"] for row in db.execute("PRAGMA table_info(images)")}
+        if "username" not in image_columns:
+            try:
+                db.execute("ALTER TABLE images ADD COLUMN username TEXT NOT NULL DEFAULT 'student'")
+            except sqlite3.OperationalError:
+                pass
+
+        agent_columns = {row["name"] for row in db.execute("PRAGMA table_info(agent_chat_messages)")}
+        if "username" not in agent_columns:
+            try:
+                db.execute("ALTER TABLE agent_chat_messages ADD COLUMN username TEXT NOT NULL DEFAULT 'student'")
+            except sqlite3.OperationalError:
+                pass
+
         timer_columns = {
             "timer_target_seconds": "INTEGER NOT NULL DEFAULT 0",
             "timer_elapsed_seconds": "INTEGER NOT NULL DEFAULT 0",
@@ -181,117 +296,68 @@ def init_db():
             if column not in task_columns:
                 try:
                     db.execute(f"ALTER TABLE tasks ADD COLUMN {column} {definition}")
-                except sqlite3.OperationalError as error:
-                    if "duplicate column name" not in str(error).lower():
-                        raise
-
-        if db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 0:
-            tasks = json.loads(TASKS_PATH.read_text(encoding="utf-8"))
-            db.executemany(
-                """
-                INSERT INTO tasks (
-                    id, date, day, week, subject, category, source, section,
-                    detail, output_standard, planned_minutes, min_images,
-                    status, student_note, supervisor_status,
-                    supervisor_comment, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '未开始', '', '待审核', '', ?)
-                """,
-                [
-                    (
-                        task["id"], task["date"], task["day"], task["week"],
-                        task["subject"], task["category"], task["source"],
-                        task["section"], task["detail"], task["output_standard"],
-                        task["planned_minutes"], task["min_images"], now_text(),
-                    )
-                    for task in tasks
-                ],
-            )
-
-        # Keep the static description for the daily vocabulary task current
-        # without touching student progress, reviews, timers, or uploaded images.
-        db.execute(
-            """
-            UPDATE tasks
-            SET source = ?, section = ?, detail = ?, output_standard = ?,
-                planned_minutes = ?
-            WHERE category = '单词背诵'
-            """,
-            (
-                "奶酪单词 App",
-                "每日新学20词",
-                "在奶酪单词 App 完成当日20个新词；按 App 流程完成学习与复习；对未掌握词汇重点复习。",
-                "当日学习完成页显示已完成20词；薄弱词或复习记录清晰可见。",
-                20,
-            ),
-        )
-
-        for category, evidence_items in EVIDENCE_GUIDE.items():
-            db.execute(
-                "UPDATE tasks SET min_images = ? WHERE category = ?",
-                (len(evidence_items), category),
-            )
-        db.execute(
-            """
-            UPDATE tasks
-            SET timer_target_seconds = planned_minutes * 60
-            WHERE timer_target_seconds IS NULL OR timer_target_seconds <= 0
-            """
-        )
+                except sqlite3.OperationalError:
+                    pass
 
         default_users = []
         student_user = os.environ.get("STUDENT_USER", "").strip()
         student_password = os.environ.get("STUDENT_PASSWORD", "")
-        if student_user and student_password:
-            default_users.append((student_user, student_password, "student", "学生"))
         supervisor_user = os.environ.get("SUPERVISOR_USER", "").strip()
         supervisor_password = os.environ.get("SUPERVISOR_PASSWORD", "")
+
+        if student_user and student_password:
+            default_users.append((student_user, student_password, "student", "学生", supervisor_user or "supervisor"))
         if supervisor_user and supervisor_password:
-            default_users.append(
-                (supervisor_user, supervisor_password, "supervisor", "监督人")
-            )
+            default_users.append((supervisor_user, supervisor_password, "supervisor", "监督人", ""))
+
         for suffix in ("", "_2", "_3"):
             extra_student_user = os.environ.get(f"EXTRA_STUDENT{suffix}_USER", "").strip()
             extra_student_password = os.environ.get(f"EXTRA_STUDENT{suffix}_PASSWORD", "")
             if extra_student_user and extra_student_password:
-                default_users.append(
-                    (
-                        extra_student_user,
-                        extra_student_password,
-                        "student",
-                        os.environ.get(f"EXTRA_STUDENT{suffix}_NAME", extra_student_user),
-                    )
-                )
+                default_users.append((
+                    extra_student_user,
+                    extra_student_password,
+                    "student",
+                    os.environ.get(f"EXTRA_STUDENT{suffix}_NAME", extra_student_user),
+                    supervisor_user or "supervisor",
+                ))
             extra_supervisor_user = os.environ.get(f"EXTRA_SUPERVISOR{suffix}_USER", "").strip()
             extra_supervisor_password = os.environ.get(f"EXTRA_SUPERVISOR{suffix}_PASSWORD", "")
             if extra_supervisor_user and extra_supervisor_password:
-                default_users.append(
-                    (
-                        extra_supervisor_user,
-                        extra_supervisor_password,
-                        "supervisor",
-                        os.environ.get(f"EXTRA_SUPERVISOR{suffix}_NAME", extra_supervisor_user),
-                    )
-                )
+                default_users.append((
+                    extra_supervisor_user,
+                    extra_supervisor_password,
+                    "supervisor",
+                    os.environ.get(f"EXTRA_SUPERVISOR{suffix}_NAME", extra_supervisor_user),
+                    "",
+                ))
+
         if not default_users:
             default_users = [
-                ("student", "student123456", "student", "学生"),
-                ("supervisor", "supervisor123456", "supervisor", "监督人"),
+                ("student", "student123456", "student", "学生", "supervisor"),
+                ("supervisor", "supervisor123456", "supervisor", "监督人", ""),
             ]
-        for username, password, role, display_name in default_users:
+
+        for username, password, role, display_name, supervisor_name in default_users:
             db.execute(
                 """
                 INSERT OR IGNORE INTO users
-                    (username, password_hash, role, display_name, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                    (username, password_hash, role, display_name, supervisor_username, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (username, generate_password_hash(password), role, display_name, now_text()),
+                (username, generate_password_hash(password), role, display_name, supervisor_name, now_text()),
             )
+
         account_admin_user = os.environ.get("ACCOUNT_ADMIN_USER", "").strip() or "supervisor"
         if account_admin_user:
             db.execute(
                 "UPDATE users SET can_manage_users = CASE WHEN username = ? THEN 1 ELSE 0 END",
                 (account_admin_user,),
             )
+
+        students = db.execute("SELECT username FROM users WHERE role = 'student'").fetchall()
+        for s in students:
+            ensure_user_tasks(db, s["username"])
 
 
 def login_required(view):
@@ -346,14 +412,15 @@ def serialize_task(row, images):
     return task
 
 
-def load_images_for_tasks(db, task_ids):
+def load_images_for_tasks(db, username, task_ids):
     result = {task_id: [] for task_id in task_ids}
     if not task_ids:
         return result
     placeholders = ",".join("?" for _ in task_ids)
+    params = [username, *task_ids]
     rows = db.execute(
-        f"SELECT * FROM images WHERE task_id IN ({placeholders}) ORDER BY id",
-        task_ids,
+        f"SELECT * FROM images WHERE username = ? AND task_id IN ({placeholders}) ORDER BY id",
+        params,
     ).fetchall()
     for row in rows:
         result[row["task_id"]].append(row)
@@ -418,7 +485,7 @@ def list_users():
     with connect_db() as db:
         rows = db.execute(
             """
-            SELECT username, role, display_name, can_manage_users, created_at
+            SELECT username, role, display_name, supervisor_username, can_manage_users, created_at
             FROM users
             ORDER BY CASE role WHEN 'student' THEN 1 ELSE 2 END, username
             """
@@ -443,6 +510,9 @@ def create_user():
     display_name = str(payload.get("display_name", "")).strip() or username
     password = str(payload.get("password", ""))
     role = payload.get("role")
+    supervisor_username = str(payload.get("supervisor_username", "")).strip()
+    if not supervisor_username and role == "student":
+        supervisor_username = session["username"] if session["role"] == "supervisor" else ""
 
     if not re.fullmatch(r"[A-Za-z0-9._-]{3,32}", username):
         return jsonify({"error": "账号需为3至32位字母、数字、点、下划线或短横线"}), 400
@@ -458,11 +528,13 @@ def create_user():
             db.execute(
                 """
                 INSERT INTO users
-                    (username, password_hash, role, display_name, can_manage_users, created_at)
-                VALUES (?, ?, ?, ?, 0, ?)
+                    (username, password_hash, role, display_name, supervisor_username, can_manage_users, created_at)
+                VALUES (?, ?, ?, ?, ?, 0, ?)
                 """,
-                (username, generate_password_hash(password), role, display_name, now_text()),
+                (username, generate_password_hash(password), role, display_name, supervisor_username, now_text()),
             )
+            if role == "student":
+                ensure_user_tasks(db, username)
     except sqlite3.IntegrityError:
         return jsonify({"error": "该账号已存在"}), 409
 
@@ -473,47 +545,137 @@ def create_user():
                 "username": username,
                 "display_name": display_name,
                 "role": role,
+                "supervisor_username": supervisor_username,
                 "can_manage_users": False,
             },
         }
     ), 201
 
 
+@app.patch("/api/users/<target_username>")
+@login_required
+@account_admin_required
+def update_user(target_username):
+    payload = request.get_json(silent=True) or {}
+    updates = {}
+
+    if "display_name" in payload:
+        display_name = str(payload["display_name"]).strip()
+        if not 1 <= len(display_name) <= 24:
+            return jsonify({"error": "显示名称需为1至24个字符"}), 400
+        updates["display_name"] = display_name
+
+    if "password" in payload and payload["password"]:
+        password = str(payload["password"])
+        if len(password) < 10:
+            return jsonify({"error": "新密码至少10位"}), 400
+        updates["password_hash"] = generate_password_hash(password)
+
+    if "role" in payload:
+        role = payload["role"]
+        if role not in {"student", "supervisor"}:
+            return jsonify({"error": "无效的角色定义"}), 400
+        updates["role"] = role
+
+    if "supervisor_username" in payload:
+        updates["supervisor_username"] = str(payload["supervisor_username"]).strip()
+
+    if "can_manage_users" in payload:
+        updates["can_manage_users"] = 1 if payload["can_manage_users"] else 0
+
+    if not updates:
+        return jsonify({"error": "没有可更新的字段"}), 400
+
+    with connect_db() as db:
+        user = db.execute("SELECT * FROM users WHERE username = ?", (target_username,)).fetchone()
+        if not user:
+            abort(404)
+
+        assignments = ", ".join(f"{key} = ?" for key in updates)
+        db.execute(
+            f"UPDATE users SET {assignments} WHERE username = ?",
+            [*updates.values(), target_username],
+        )
+
+        new_role = updates.get("role", user["role"])
+        if new_role == "student":
+            ensure_user_tasks(db, target_username)
+
+    return jsonify({"ok": True, "username": target_username})
+
+
+@app.get("/api/supervisor/students")
+@login_required
+def list_supervised_students():
+    current_user = session["username"]
+    role = session["role"]
+    can_manage = session["can_manage_users"]
+
+    if role != "supervisor" and not can_manage:
+        return jsonify({"error": "没有访问权限"}), 403
+
+    with connect_db() as db:
+        if can_manage:
+            rows = db.execute(
+                """
+                SELECT username, display_name, supervisor_username, created_at
+                FROM users WHERE role = 'student'
+                ORDER BY username
+                """
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """
+                SELECT username, display_name, supervisor_username, created_at
+                FROM users WHERE role = 'student' AND (supervisor_username = ? OR supervisor_username = '' OR supervisor_username IS NULL)
+                ORDER BY username
+                """,
+                (current_user,)
+            ).fetchall()
+
+    return jsonify({"ok": True, "students": [dict(r) for r in rows]})
+
+
 @app.get("/api/summary")
 @login_required
 def summary():
     with connect_db() as db:
+        student_user = get_active_student_username(db)
         overall = db.execute(
             """
             SELECT COUNT(*) AS total,
                    SUM(CASE WHEN status = '已完成' THEN 1 ELSE 0 END) AS completed,
                    SUM(planned_minutes) AS planned_minutes
-            FROM tasks
-            """
+            FROM tasks WHERE username = ?
+            """,
+            (student_user,)
         ).fetchone()
         subjects = db.execute(
             """
             SELECT subject, COUNT(*) AS total,
                    SUM(CASE WHEN status = '已完成' THEN 1 ELSE 0 END) AS completed
-            FROM tasks GROUP BY subject
+            FROM tasks WHERE username = ? GROUP BY subject
             ORDER BY CASE subject WHEN '数学' THEN 1 WHEN '物理' THEN 2 WHEN '化学' THEN 3 ELSE 4 END
-            """
+            """,
+            (student_user,)
         ).fetchall()
         weeks = db.execute(
             """
             SELECT week, COUNT(*) AS total,
                    SUM(CASE WHEN status = '已完成' THEN 1 ELSE 0 END) AS completed
-            FROM tasks GROUP BY week ORDER BY week
-            """
+            FROM tasks WHERE username = ? GROUP BY week ORDER BY week
+            """,
+            (student_user,)
         ).fetchall()
-        image_count = db.execute("SELECT COUNT(*) FROM images").fetchone()[0]
-        date_rows = db.execute("SELECT DISTINCT date, day FROM tasks ORDER BY date").fetchall()
+        image_count = db.execute("SELECT COUNT(*) FROM images WHERE username = ?", (student_user,)).fetchone()[0]
+        date_rows = db.execute("SELECT DISTINCT date, day FROM tasks WHERE username = ? ORDER BY date", (student_user,)).fetchall()
     return jsonify(
         {
             "today": datetime.now().strftime("%Y-%m-%d"),
-            "total": overall["total"],
-            "completed": overall["completed"] or 0,
-            "planned_minutes": overall["planned_minutes"] or 0,
+            "student_username": student_user,
+            "total": overall["total"] if overall else 0,
+            "completed": overall["completed"] or 0 if overall else 0,
+            "planned_minutes": overall["planned_minutes"] or 0 if overall else 0,
             "image_count": image_count,
             "subjects": [dict(row) for row in subjects],
             "weeks": [dict(row) for row in weeks],
@@ -528,19 +690,20 @@ def list_tasks():
     selected_date = request.args.get("date")
     subject = request.args.get("subject")
     status = request.args.get("status")
-    clauses = []
-    params = []
-    if selected_date:
-        clauses.append("date = ?")
-        params.append(selected_date)
-    if subject in SUBJECTS:
-        clauses.append("subject = ?")
-        params.append(subject)
-    if status in TASK_STATUSES:
-        clauses.append("status = ?")
-        params.append(status)
-    where = "WHERE " + " AND ".join(clauses) if clauses else ""
     with connect_db() as db:
+        student_user = get_active_student_username(db)
+        clauses = ["username = ?"]
+        params = [student_user]
+        if selected_date:
+            clauses.append("date = ?")
+            params.append(selected_date)
+        if subject in SUBJECTS:
+            clauses.append("subject = ?")
+            params.append(subject)
+        if status in TASK_STATUSES:
+            clauses.append("status = ?")
+            params.append(status)
+        where = "WHERE " + " AND ".join(clauses)
         rows = db.execute(
             f"""
             SELECT * FROM tasks {where}
@@ -550,7 +713,7 @@ def list_tasks():
             """,
             params,
         ).fetchall()
-        image_map = load_images_for_tasks(db, [row["id"] for row in rows])
+        image_map = load_images_for_tasks(db, student_user, [row["id"] for row in rows])
     return jsonify([serialize_task(row, image_map[row["id"]]) for row in rows])
 
 
@@ -560,29 +723,30 @@ def update_task(task_id):
     payload = request.get_json(silent=True) or {}
     role = session["role"]
     updates = {}
-    if role == "student":
-        if payload.get("status") in TASK_STATUSES:
-            updates["status"] = payload["status"]
-        if "student_note" in payload:
-            updates["student_note"] = str(payload["student_note"])[:2000]
-    else:
-        if payload.get("supervisor_status") in REVIEW_STATUSES:
-            updates["supervisor_status"] = payload["supervisor_status"]
-        if "supervisor_comment" in payload:
-            updates["supervisor_comment"] = str(payload["supervisor_comment"])[:2000]
-        if payload.get("status") in TASK_STATUSES:
-            updates["status"] = payload["status"]
-    if not updates:
-        return jsonify({"error": "没有可更新的字段"}), 400
-    updates["updated_at"] = now_text()
-    assignments = ", ".join(f"{key} = ?" for key in updates)
     with connect_db() as db:
-        exists = db.execute("SELECT 1 FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        student_user = get_active_student_username(db)
+        if role == "student":
+            if payload.get("status") in TASK_STATUSES:
+                updates["status"] = payload["status"]
+            if "student_note" in payload:
+                updates["student_note"] = str(payload["student_note"])[:2000]
+        else:
+            if payload.get("supervisor_status") in REVIEW_STATUSES:
+                updates["supervisor_status"] = payload["supervisor_status"]
+            if "supervisor_comment" in payload:
+                updates["supervisor_comment"] = str(payload["supervisor_comment"])[:2000]
+            if payload.get("status") in TASK_STATUSES:
+                updates["status"] = payload["status"]
+        if not updates:
+            return jsonify({"error": "没有可更新的字段"}), 400
+        updates["updated_at"] = now_text()
+        assignments = ", ".join(f"{key} = ?" for key in updates)
+        exists = db.execute("SELECT 1 FROM tasks WHERE username = ? AND id = ?", (student_user, task_id)).fetchone()
         if not exists:
             abort(404)
         db.execute(
-            f"UPDATE tasks SET {assignments} WHERE id = ?",
-            [*updates.values(), task_id],
+            f"UPDATE tasks SET {assignments} WHERE username = ? AND id = ?",
+            [*updates.values(), student_user, task_id],
         )
     return jsonify({"ok": True})
 
@@ -591,8 +755,10 @@ def update_task(task_id):
 @login_required
 def active_timer():
     with connect_db() as db:
+        student_user = get_active_student_username(db)
         row = db.execute(
-            "SELECT * FROM tasks WHERE timer_state = 'running' ORDER BY timer_started_at LIMIT 1"
+            "SELECT * FROM tasks WHERE username = ? AND timer_state = 'running' ORDER BY timer_started_at LIMIT 1",
+            (student_user,)
         ).fetchone()
     return jsonify({"task": serialize_task(row, []) if row else None})
 
@@ -603,13 +769,14 @@ def update_timer(task_id):
     if session["role"] != "student":
         return jsonify({"error": "只有学生账号可以操作计时器"}), 403
 
+    current_user = session["username"]
     payload = request.get_json(silent=True) or {}
     action = payload.get("action")
     if action not in {"start", "pause", "resume", "finish", "reset"}:
         return jsonify({"error": "无效的计时操作"}), 400
 
     with connect_db() as db:
-        task = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        task = db.execute("SELECT * FROM tasks WHERE username = ? AND id = ?", (current_user, task_id)).fetchone()
         if not task:
             abort(404)
 
@@ -620,8 +787,8 @@ def update_timer(task_id):
 
         if action in {"start", "resume"}:
             running = db.execute(
-                "SELECT id FROM tasks WHERE timer_state = 'running' AND id <> ? LIMIT 1",
-                (task_id,),
+                "SELECT id FROM tasks WHERE username = ? AND timer_state = 'running' AND id <> ? LIMIT 1",
+                (current_user, task_id),
             ).fetchone()
             if running:
                 return jsonify({"error": f"请先暂停任务 {running['id']} 的计时"}), 409
@@ -673,11 +840,11 @@ def update_timer(task_id):
 
         assignments = ", ".join(f"{key} = ?" for key in updates)
         db.execute(
-            f"UPDATE tasks SET {assignments} WHERE id = ?",
-            [*updates.values(), task_id],
+            f"UPDATE tasks SET {assignments} WHERE username = ? AND id = ?",
+            [*updates.values(), current_user, task_id],
         )
-        updated = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        images = load_images_for_tasks(db, [task_id])[task_id]
+        updated = db.execute("SELECT * FROM tasks WHERE username = ? AND id = ?", (current_user, task_id)).fetchone()
+        images = load_images_for_tasks(db, current_user, [task_id])[task_id]
     return jsonify({"ok": True, "task": serialize_task(updated, images)})
 
 
@@ -715,8 +882,9 @@ def upload_images(task_id):
     files = request.files.getlist("images")
     if not files or len(files) > 20:
         return jsonify({"error": "请选择1至20张图片"}), 400
+    current_user = session["username"]
     with connect_db() as db:
-        if not db.execute("SELECT 1 FROM tasks WHERE id = ?", (task_id,)).fetchone():
+        if not db.execute("SELECT 1 FROM tasks WHERE username = ? AND id = ?", (current_user, task_id)).fetchone():
             abort(404)
         saved = []
         try:
@@ -725,10 +893,10 @@ def upload_images(task_id):
                 cursor = db.execute(
                     """
                     INSERT INTO images
-                        (task_id, filename, thumb_filename, original_name, caption, created_at)
-                    VALUES (?, ?, ?, ?, '', ?)
+                        (username, task_id, filename, thumb_filename, original_name, caption, created_at)
+                    VALUES (?, ?, ?, ?, ?, '', ?)
                     """,
-                    (task_id, filename, thumb_filename, original_name, now_text()),
+                    (current_user, task_id, filename, thumb_filename, original_name, now_text()),
                 )
                 saved.append(cursor.lastrowid)
         except Exception as error:
@@ -739,13 +907,22 @@ def upload_images(task_id):
 @app.delete("/api/images/<int:image_id>")
 @login_required
 def delete_image(image_id):
+    current_user = session["username"]
+    role = session["role"]
     with connect_db() as db:
-        row = db.execute("SELECT * FROM images WHERE id = ?", (image_id,)).fetchone()
+        if role == "student":
+            row = db.execute("SELECT * FROM images WHERE id = ? AND username = ?", (image_id, current_user)).fetchone()
+        else:
+            row = db.execute("SELECT * FROM images WHERE id = ?", (image_id,)).fetchone()
         if not row:
             abort(404)
         db.execute("DELETE FROM images WHERE id = ?", (image_id,))
     for path in (UPLOAD_DIR / row["filename"], THUMB_DIR / row["thumb_filename"]):
-        path.unlink(missing_ok=True)
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError:
+            pass
     return jsonify({"ok": True})
 
 
@@ -790,11 +967,12 @@ def health():
 @app.get("/api/agent/history")
 @login_required
 def get_agent_history():
+    current_user = session["username"]
     session_id = request.args.get("session_id", "physics")
     with connect_db() as db:
         rows = db.execute(
-            "SELECT * FROM agent_chat_messages WHERE session_id = ? ORDER BY id ASC",
-            (session_id,)
+            "SELECT * FROM agent_chat_messages WHERE username = ? AND session_id = ? ORDER BY id ASC",
+            (current_user, session_id)
         ).fetchall()
         
         # 如果当前会话尚无记录，且是默认会话，则预置初始物理会话欢迎词与精美公式对比
@@ -803,22 +981,23 @@ def get_agent_history():
             db.execute(
                 """
                 INSERT INTO agent_chat_messages 
-                (session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
+                (username, session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
                 VALUES 
-                ('physics', 'assistant', '哈喽！我是你的 3D 伴学萌宠 **CX-Agent**！😸\n\n我已经与你的今日学习状态同步了！如果你在写作业、整理草稿纸时遇到不懂的物理推导，可以随时**上传题目截图**或者发送**语音消息**向我提问哦！', '', '', '', '', ?)
+                (?, 'physics', 'assistant', '哈喽！我是你的 3D 伴学萌宠 **CX-Agent**！😸\n\n我已经与你的今日学习状态同步了！如果你在写作业、整理草稿纸时遇到不懂的物理推导，可以随时**上传题目截图**或者发送**语音消息**向我提问哦！', '', '', '', '', ?)
                 """,
-                (now,)
+                (current_user, now)
             )
             rows = db.execute(
-                "SELECT * FROM agent_chat_messages WHERE session_id = ? ORDER BY id ASC",
-                (session_id,)
+                "SELECT * FROM agent_chat_messages WHERE username = ? AND session_id = ? ORDER BY id ASC",
+                (current_user, session_id)
             ).fetchall()
             
         messages = [dict(row) for row in rows]
         
         # 获取所有已存在的会话 ID 列表
         session_rows = db.execute(
-            "SELECT DISTINCT session_id FROM agent_chat_messages"
+            "SELECT DISTINCT session_id FROM agent_chat_messages WHERE username = ?",
+            (current_user,)
         ).fetchall()
         sessions = [row["session_id"] for row in session_rows] or ["physics"]
 
@@ -843,7 +1022,7 @@ def agent_upload():
     file_storage.save(dest_path)
     
     file_size = dest_path.stat().st_size
-    size_kb = Math_round = Math_round = Math_round = round(file_size / 1024)
+    size_kb = round(file_size / 1024)
     size_str = f"{round(size_kb / 1024, 1)} MB" if size_kb > 1024 else f"{size_kb} KB"
     
     is_image = ext in ["jpg", "jpeg", "png", "gif", "webp", "heic"]
@@ -863,6 +1042,7 @@ def agent_upload():
 @app.post("/api/agent/chat")
 @login_required
 def agent_chat():
+    current_user = session["username"]
     payload = request.get_json(silent=True) or {}
     message_text = payload.get("message", "").strip()
     session_id = payload.get("session_id", "physics")
@@ -881,74 +1061,122 @@ def agent_chat():
         db.execute(
             """
             INSERT INTO agent_chat_messages 
-            (session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
-            VALUES (?, 'user', ?, ?, ?, ?, ?, ?)
+            (username, session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
+            VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?)
             """,
-            (session_id, message_text, attachment_name, attachment_type, attachment_size, task_id, now)
+            (current_user, session_id, message_text, attachment_name, attachment_type, attachment_size, task_id, now)
         )
 
         # 获取关联任务信息（如有）
         task_info = ""
         if task_id:
-            task_row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            task_row = db.execute("SELECT * FROM tasks WHERE username = ? AND id = ?", (current_user, task_id)).fetchone()
             if task_row:
                 task_info = f"【关联任务】{task_row['subject']} - {task_row['category']}: {task_row['detail']} (输出标准: {task_row['output_standard']})"
 
-        # 2. 判断是否设置了 Gemini API Key
-        gemini_api_key = os.environ.get("GEMINI_API_KEY")
-        ai_reply = ""
+        # 查询多轮对话历史上下文 (最近 10 条)
+        history_rows = db.execute(
+            """
+            SELECT role, content FROM agent_chat_messages 
+            WHERE username = ? AND session_id = ? AND id < (SELECT MAX(id) FROM agent_chat_messages WHERE username = ? AND session_id = ?)
+            ORDER BY id DESC LIMIT 10
+            """,
+            (current_user, session_id, current_user, session_id)
+        ).fetchall()
+        history = [{"role": row["role"], "content": row["content"]} for row in reversed(history_rows)]
 
-        if gemini_api_key:
-            try:
-                import urllib.request
-                import json as pyjson
-                
-                system_prompt = f"你是一个名为 CX-Agent 的 3D AI 伴学萌宠管家，专为高二学生提供数理化英语答疑与辅导。态度温和鼓励，格式支持 Markdown 加粗、行内代码与 LaTeX 公式 (如 \\(a = g \\sin\\theta\\))。{task_info}"
-                
-                prompt_content = f"{system_prompt}\n\n用户消息: {message_text}"
-                if attachment_name:
-                    prompt_content += f"\n[用户上传附件: {attachment_name} ({attachment_size})]"
-
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
-                req_data = pyjson.dumps({
-                    "contents": [{"parts": [{"text": prompt_content}]}]
-                }).encode("utf-8")
-                
-                req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    res_json = pyjson.loads(response.read().decode("utf-8"))
-                    candidates = res_json.get("candidates", [])
-                    if candidates:
-                        ai_reply = candidates[0]["content"]["parts"][0]["text"]
-            except Exception as e:
-                ai_reply = f"已通过 AI 引擎接收到你的问题！由于网络接入波动，启动智能备用推理模型为您回答：\n\n关于`{task_id or '学习任务'}`的推导，请注意受力平衡与公式 \\(F_N = mg \\cos\\theta\\)！"
-
-        # 智能备用回复逻辑 (包含标准学科知识与 Markdown 公式)
-        if not ai_reply:
-            if attachment_name and ("pdf" in attachment_name.lower() or "doc" in attachment_name.lower() or "zip" in attachment_name.lower()):
-                ai_reply = f"我已接收到你上传的学习文档 **{attachment_name}** ({attachment_size})！\n\n我分析了这篇文档的提纲，发现它与你当前正在进行的学习任务关联极其紧密。我已经帮你在后台进行了知识点索引！\n\n请问关于这篇复习资料中的任何物理定理或公式，需要我为你详细拆解吗？"
-            elif attachment_name:
-                ai_reply = f"我看清了你刚才上传的题目图片！这道题属于高二物理经典的**斜面滑块受力模型**。\n\n根据受力平衡方程，在垂直于斜面方向上：\n\n<div class=\"math-block\">\\(F_N = mg \\cos\\theta\\)</div>\n\n你可以使用这个公式来求滑动摩擦力：\n\n<div class=\"math-block\">\\(f = \\mu F_N = \\mu mg \\cos\\theta\\)</div>\n\n代入数值计算即可完成打卡！🌟"
-            elif "物理" in message_text or task_id.startswith("D06-P"):
-                ai_reply = f"物理任务 `D06-P1` 要求探究**斜面体动力学模型**。📘\n\n**建议策略**：\n1. 请保持专注，分析斜面上的物体受力：重力分力 \\(mg \\sin\\theta\\) 和摩擦力 \\(f = \\mu mg \\cos\\theta\\)。\n2. 计算得出合加速度为：\n\n<div class=\"math-block\">\\(a = g(\\sin\\theta - \\mu\\cos\\theta)\\)</div>\n\n在草稿纸上完成推导后，拍照上传给我即可！"
-            elif "化学" in message_text or "同分异构" in message_text:
-                ai_reply = f"有机化学基础重点：**同分异构体分类** 🧪\n\n1. **碳链异构**：碳骨架排列方式不同。\n2. **位置异构**：官能团在碳链上的位置不同。\n3. **官能团异构**：如乙醇与甲醚（分子式均为 \\(C_2H_6O\\)）。"
-            elif "累" in message_text or "鼓励" in message_text:
-                ai_reply = f"你今天已经完成了**数学和化学**打卡，这非常了不起！💪\n\n*“长夏逝去，凉秋将至；今日的流汗，是明日衔接高二的底气。”*\n\n喝口水，揉揉眼睛，长夏学程陪伴着你，加油！🌟"
-            else:
-                ai_reply = f"我是你的 3D AI 伴学管家 CX-Agent！我已经同步了你的任务数据。你可以向我提问具体的**数理化习题**，或者上传照片/资料文档让我帮你规划！"
+        # 2. 调用 LLM 客户端
+        llm_client = LLMClient()
+        ai_reply = llm_client.generate_response(
+            user_message=message_text,
+            history=history,
+            task_info=task_info,
+            attachment_name=attachment_name,
+            attachment_size=attachment_size,
+        )
 
         # 3. 记录 AI 回复
         db.execute(
             """
             INSERT INTO agent_chat_messages 
-            (session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
-            VALUES (?, 'assistant', ?, '', '', '', ?, ?)
+            (username, session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
+            VALUES (?, ?, 'assistant', ?, '', '', '', ?, ?)
             """,
-            (session_id, ai_reply, task_id, now_text())
+            (current_user, session_id, ai_reply, task_id, now_text())
         )
 
     return jsonify({"ok": True, "reply": ai_reply, "session_id": session_id})
+
+
+@app.post("/api/agent/chat/stream")
+@login_required
+def agent_chat_stream():
+    current_user = session["username"]
+    payload = request.get_json(silent=True) or {}
+    message_text = payload.get("message", "").strip()
+    session_id = payload.get("session_id", "physics")
+    task_id = payload.get("task_id", "")
+    attachment_name = payload.get("attachment_name", "")
+    attachment_type = payload.get("attachment_type", "")
+    attachment_size = payload.get("attachment_size", "")
+    
+    if not message_text and not attachment_name:
+        return jsonify({"error": "消息内容或附件不能为空"}), 400
+
+    now = now_text()
+
+    with connect_db() as db:
+        db.execute(
+            """
+            INSERT INTO agent_chat_messages 
+            (username, session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
+            VALUES (?, ?, 'user', ?, ?, ?, ?, ?, ?)
+            """,
+            (current_user, session_id, message_text, attachment_name, attachment_type, attachment_size, task_id, now)
+        )
+
+        task_info = ""
+        if task_id:
+            task_row = db.execute("SELECT * FROM tasks WHERE username = ? AND id = ?", (current_user, task_id)).fetchone()
+            if task_row:
+                task_info = f"【关联任务】{task_row['subject']} - {task_row['category']}: {task_row['detail']} (输出标准: {task_row['output_standard']})"
+
+        history_rows = db.execute(
+            """
+            SELECT role, content FROM agent_chat_messages 
+            WHERE username = ? AND session_id = ? AND id < (SELECT MAX(id) FROM agent_chat_messages WHERE username = ? AND session_id = ?)
+            ORDER BY id DESC LIMIT 10
+            """,
+            (current_user, session_id, current_user, session_id)
+        ).fetchall()
+        history = [{"role": row["role"], "content": row["content"]} for row in reversed(history_rows)]
+
+    def generate_sse():
+        llm_client = LLMClient()
+        full_chunks = []
+        for chunk in llm_client.generate_stream(
+            user_message=message_text,
+            history=history,
+            task_info=task_info,
+            attachment_name=attachment_name,
+            attachment_size=attachment_size,
+        ):
+            full_chunks.append(chunk)
+            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+
+        full_reply = "".join(full_chunks)
+        with connect_db() as db:
+            db.execute(
+                """
+                INSERT INTO agent_chat_messages 
+                (username, session_id, role, content, attachment_filename, attachment_type, attachment_size, task_id, created_at)
+                VALUES (?, ?, 'assistant', ?, '', '', '', ?, ?)
+                """,
+                (current_user, session_id, full_reply, task_id, now_text())
+            )
+        yield f"data: {json.dumps({'done': True, 'full_reply': full_reply})}\n\n"
+
+    return Response(stream_with_context(generate_sse()), mimetype="text/event-stream")
 
 
 
