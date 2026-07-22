@@ -272,6 +272,11 @@ def init_db():
                         os.environ.get(f"EXTRA_SUPERVISOR{suffix}_NAME", extra_supervisor_user),
                     )
                 )
+        if not default_users:
+            default_users = [
+                ("student", "student123456", "student", "学生"),
+                ("supervisor", "supervisor123456", "supervisor", "监督人"),
+            ]
         for username, password, role, display_name in default_users:
             db.execute(
                 """
@@ -281,7 +286,7 @@ def init_db():
                 """,
                 (username, generate_password_hash(password), role, display_name, now_text()),
             )
-        account_admin_user = os.environ.get("ACCOUNT_ADMIN_USER", "").strip()
+        account_admin_user = os.environ.get("ACCOUNT_ADMIN_USER", "").strip() or "supervisor"
         if account_admin_user:
             db.execute(
                 "UPDATE users SET can_manage_users = CASE WHEN username = ? THEN 1 ELSE 0 END",
