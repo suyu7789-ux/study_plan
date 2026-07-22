@@ -12,7 +12,8 @@ def deploy_sftp():
         "app/app.py",
         "app/templates/index.html",
         "app/static/app.js",
-        "app/static/app.css"
+        "app/static/app.css",
+        "app/static/vendor/three.min.js"
     ]
 
     for rel_path in files_to_sync:
