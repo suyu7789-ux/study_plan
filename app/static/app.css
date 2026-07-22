@@ -1587,7 +1587,8 @@ svg { flex: 0 0 auto; }
   box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6), 0 0 50px rgba(45, 212, 191, 0.05);
   overflow: hidden;
   z-index: 990;
-  transition: all 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.28s ease;
+  will-change: transform, opacity;
   opacity: 1;
   transform: translateX(0);
 }
@@ -2013,11 +2014,12 @@ svg { flex: 0 0 auto; }
   .desktop-pet-container {
     right: 16px;
     bottom: 20px;
+    z-index: 1000;
   }
   .desktop-pet-container.panel-open {
-    opacity: 0;
-    pointer-events: none;
-    transform: scale(0.6);
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: scale(0.85);
   }
   .pet-avatar-body {
     width: 85px;
@@ -2036,7 +2038,8 @@ svg { flex: 0 0 auto; }
     background: rgba(11, 16, 28, 0.98);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    will-change: transform;
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.28s ease;
+    will-change: transform, opacity;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
   }
 
@@ -2047,6 +2050,7 @@ svg { flex: 0 0 auto; }
   }
 
   .agent-drawer-backdrop {
+    transition: opacity 0.32s ease;
     will-change: opacity;
   }
 
