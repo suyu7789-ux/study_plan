@@ -1448,7 +1448,7 @@ svg { flex: 0 0 auto; }
   align-items: center;
   cursor: pointer;
   user-select: none;
-  transition: right 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), bottom 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s ease;
+  transition: right 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), bottom 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), left 0.38s cubic-bezier(0.32, 0.72, 0, 1), top 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.3s ease;
 }
 
 .desktop-pet-container.panel-open {
@@ -2020,6 +2020,26 @@ svg { flex: 0 0 auto; }
     opacity: 1 !important;
     pointer-events: auto !important;
     transform: scale(0.85);
+  }
+  .desktop-pet-container.panel-open .pet-speech-bubble {
+    top: 95px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%) scale(0.9);
+  }
+  .desktop-pet-container.panel-open .pet-speech-bubble::after {
+    top: -6px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    border-width: 0 6px 6px;
+    border-color: transparent transparent rgba(15, 23, 42, 0.9);
+  }
+  .desktop-pet-container.panel-open .pet-speech-bubble.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
   }
   .pet-avatar-body {
     width: 85px;

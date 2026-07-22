@@ -1513,7 +1513,11 @@ function initAgentPet() {
         petDragState.hasMoved = false;
         return;
       }
-      toggleAgentDrawer();
+      const panel = document.getElementById("agentPanel");
+      const isOpen = panel && panel.classList.contains("is-open");
+      if (!isOpen) {
+        openAgentDrawer();
+      }
       triggerPetRaycast(e);
     });
 
@@ -1766,7 +1770,7 @@ function initPetDrag() {
   function onPointerUp() {
     if (!petDragState.isDragging) return;
     petDragState.isDragging = false;
-    pet.style.transition = "transform 0.3s ease, opacity 0.3s ease";
+    pet.style.transition = "left 0.38s cubic-bezier(0.32, 0.72, 0, 1), top 0.38s cubic-bezier(0.32, 0.72, 0, 1), right 0.38s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.3s ease, opacity 0.3s ease";
   }
 
   pet.addEventListener("mousedown", onPointerDown);
@@ -1779,6 +1783,8 @@ function initPetDrag() {
 }
 
 // Drawer Toggle Logic
+let preOpenPetPos = null;
+
 function toggleAgentDrawer() {
   const panel = document.getElementById("agentPanel");
   if (panel && panel.classList.contains("is-open")) {
@@ -1793,11 +1799,43 @@ function openAgentDrawer() {
   const pet = document.getElementById("desktopPetContainer");
   const backdrop = document.getElementById("agentDrawerBackdrop");
 
+  if (panel && panel.classList.contains("is-open")) return;
+
+  if (pet) {
+    const rect = pet.getBoundingClientRect();
+    preOpenPetPos = {
+      left: pet.style.left,
+      top: pet.style.top,
+      right: pet.style.right,
+      bottom: pet.style.bottom,
+      rectLeft: rect.left,
+      rectTop: rect.top
+    };
+
+    pet.classList.add("panel-open");
+
+    if (window.innerWidth <= 768) {
+      pet.style.right = "auto";
+      pet.style.bottom = "auto";
+      pet.style.left = `${rect.left}px`;
+      pet.style.top = `${rect.top}px`;
+
+      void pet.offsetHeight;
+      pet.style.transition = "left 0.38s cubic-bezier(0.32, 0.72, 0, 1), top 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.3s ease, opacity 0.3s ease";
+
+      const petWidth = pet.offsetWidth || 85;
+      const targetLeft = Math.max(10, (window.innerWidth - petWidth) / 2);
+      const targetTop = Math.max(8, window.innerHeight * 0.12 - petWidth - 6);
+
+      pet.style.left = `${targetLeft}px`;
+      pet.style.top = `${targetTop}px`;
+    }
+  }
+
   if (panel) {
     panel.classList.remove("is-closed");
     panel.classList.add("is-open");
   }
-  if (pet) pet.classList.add("panel-open");
   if (backdrop) backdrop.classList.add("is-visible");
 
   // 延迟 200ms 加载对话历史，确保移动端 slide-up CSS 动画 60fps 丝滑播放
@@ -1815,8 +1853,28 @@ function closeAgentDrawer() {
     panel.classList.add("is-closed");
     panel.classList.remove("is-open");
   }
-  if (pet) pet.classList.remove("panel-open");
   if (backdrop) backdrop.classList.remove("is-visible");
+
+  if (pet) {
+    pet.classList.remove("panel-open");
+
+    if (preOpenPetPos) {
+      pet.style.transition = "left 0.38s cubic-bezier(0.32, 0.72, 0, 1), top 0.38s cubic-bezier(0.32, 0.72, 0, 1), right 0.38s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.3s ease, opacity 0.3s ease";
+
+      if (preOpenPetPos.left || preOpenPetPos.top) {
+        pet.style.left = preOpenPetPos.left || `${preOpenPetPos.rectLeft}px`;
+        pet.style.top = preOpenPetPos.top || `${preOpenPetPos.rectTop}px`;
+        pet.style.right = preOpenPetPos.right || "auto";
+        pet.style.bottom = preOpenPetPos.bottom || "auto";
+      } else {
+        pet.style.left = "";
+        pet.style.top = "";
+        pet.style.right = "";
+        pet.style.bottom = "";
+      }
+      preOpenPetPos = null;
+    }
+  }
 }
 
 
