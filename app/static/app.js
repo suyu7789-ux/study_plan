@@ -1724,19 +1724,12 @@ function initPetDrag() {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    const rect = pet.getBoundingClientRect();
     petDragState.isDragging = true;
     petDragState.hasMoved = false;
     petDragState.startX = clientX;
     petDragState.startY = clientY;
-    petDragState.initialLeft = rect.left;
-    petDragState.initialTop = rect.top;
-
-    pet.style.right = "auto";
-    pet.style.bottom = "auto";
-    pet.style.left = `${rect.left}px`;
-    pet.style.top = `${rect.top}px`;
-    pet.style.transition = "none";
+    petDragState.initialLeft = pet.offsetLeft;
+    petDragState.initialTop = pet.offsetTop;
   }
 
   function onPointerMove(e) {
@@ -1747,8 +1740,13 @@ function initPetDrag() {
     const dx = clientX - petDragState.startX;
     const dy = clientY - petDragState.startY;
 
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+    if (!petDragState.hasMoved && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
       petDragState.hasMoved = true;
+      pet.style.right = "auto";
+      pet.style.bottom = "auto";
+      pet.style.left = `${petDragState.initialLeft}px`;
+      pet.style.top = `${petDragState.initialTop}px`;
+      pet.style.transition = "none";
     }
 
     if (petDragState.hasMoved) {
@@ -1770,7 +1768,9 @@ function initPetDrag() {
   function onPointerUp() {
     if (!petDragState.isDragging) return;
     petDragState.isDragging = false;
-    pet.style.transition = "left 0.38s cubic-bezier(0.32, 0.72, 0, 1), top 0.38s cubic-bezier(0.32, 0.72, 0, 1), right 0.38s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.3s ease, opacity 0.3s ease";
+    if (petDragState.hasMoved) {
+      pet.style.transition = "left 0.38s cubic-bezier(0.32, 0.72, 0, 1), top 0.38s cubic-bezier(0.32, 0.72, 0, 1), right 0.38s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.3s ease, opacity 0.3s ease";
+    }
   }
 
   pet.addEventListener("mousedown", onPointerDown);

@@ -1555,6 +1555,12 @@ svg { flex: 0 0 auto; }
   transform: translateX(0);
 }
 
+.desktop-pet-container.panel-open .pet-tooltip {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .floating-heart {
   position: absolute;
   color: #ff5d9e;
