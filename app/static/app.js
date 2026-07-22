@@ -1436,74 +1436,65 @@ function initAgentPet() {
 
   agentThreeScene = new THREE.Scene();
   agentCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  agentCamera.position.set(0, -0.05, 4.6);
+  agentCamera.position.set(0, -0.15, 3.2);
 
   agentRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
   agentRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   agentRenderer.setSize(100, 100);
-  agentRenderer.shadowMap.enabled = true;
   container.appendChild(agentRenderer.domElement);
 
   agentRobotGroup = new THREE.Group();
   agentThreeScene.add(agentRobotGroup);
 
-  const porcelainMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, roughness: 0.12, metalness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.08
+  const porcelainMat = new THREE.MeshPhongMaterial({
+    color: 0xf8fafc, specular: 0xffffff, shininess: 85
   });
-  const screenMat = new THREE.MeshStandardMaterial({
-    color: 0x070913, roughness: 0.08, metalness: 0.95
+  const screenMat = new THREE.MeshPhongMaterial({
+    color: 0x0f172a, specular: 0x38bdf8, shininess: 100
   });
-  const eyeGlowMat = new THREE.MeshStandardMaterial({
-    color: 0x2dd4bf, emissive: 0x2dd4bf, emissiveIntensity: 2.0
-  });
-  agentBlushMaterial = new THREE.MeshStandardMaterial({
-    color: 0xff5d9e, emissive: 0xff5d9e, emissiveIntensity: 1.5
-  });
-  agentBadgeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2dd4bf, emissive: 0x2dd4bf, emissiveIntensity: 2.5
-  });
-  agentBaseRingMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8c70ed, emissive: 0x8c70ed, emissiveIntensity: 1.8
-  });
+  const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf });
+  agentBlushMaterial = new THREE.MeshBasicMaterial({ color: 0xff65a3 });
+  agentBadgeMaterial = new THREE.MeshBasicMaterial({ color: 0x2dd4bf });
+  agentBaseRingMaterial = new THREE.MeshBasicMaterial({ color: 0x8c70ed });
 
   // 头部
-  agentHead = new THREE.Mesh(new THREE.SphereGeometry(0.75, 32, 32), porcelainMat);
+  agentHead = new THREE.Mesh(new THREE.SphereGeometry(0.72, 32, 32), porcelainMat);
   agentHead.position.y = 0.2;
   agentRobotGroup.add(agentHead);
 
-  const screenGeom = new THREE.SphereGeometry(0.756, 32, 32, Math.PI / 2 - Math.PI / 3, Math.PI * 2 / 3, Math.PI / 4 + 0.05, Math.PI / 2.1);
+  const screenGeom = new THREE.SphereGeometry(0.724, 32, 32, Math.PI * 0.35, Math.PI * 0.3, Math.PI * 0.38, Math.PI * 0.26);
   const screen = new THREE.Mesh(screenGeom, screenMat);
   agentHead.add(screen);
 
   agentLeftEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), eyeGlowMat);
   agentLeftEye.scale.set(1, 1.25, 0.5);
-  agentLeftEye.position.set(-0.24, 0.08, 0.71);
+  agentLeftEye.position.set(-0.22, 0.08, 0.68);
   agentHead.add(agentLeftEye);
 
   agentRightEye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), eyeGlowMat);
   agentRightEye.scale.set(1, 1.25, 0.5);
-  agentRightEye.position.set(0.24, 0.08, 0.71);
+  agentRightEye.position.set(0.22, 0.08, 0.68);
   agentHead.add(agentRightEye);
 
   const mouthGeom = new THREE.TorusGeometry(0.038, 0.012, 8, 16, Math.PI);
   const leftMouth = new THREE.Mesh(mouthGeom, eyeGlowMat);
   leftMouth.rotation.set(0, 0, Math.PI);
-  leftMouth.position.set(-0.035, -0.07, 0.725);
+  leftMouth.position.set(-0.035, -0.07, 0.695);
   agentHead.add(leftMouth);
 
   const rightMouth = new THREE.Mesh(mouthGeom, eyeGlowMat);
   rightMouth.rotation.set(0, 0, Math.PI);
-  rightMouth.position.set(0.035, -0.07, 0.725);
+  rightMouth.position.set(0.035, -0.07, 0.695);
   agentHead.add(rightMouth);
 
   agentLeftBlush = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), agentBlushMaterial);
   agentLeftBlush.scale.set(1.6, 0.8, 0.5);
-  agentLeftBlush.position.set(-0.36, -0.1, 0.66);
+  agentLeftBlush.position.set(-0.35, -0.1, 0.64);
   agentHead.add(agentLeftBlush);
 
   agentRightBlush = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), agentBlushMaterial);
   agentRightBlush.scale.set(1.6, 0.8, 0.5);
-  agentRightBlush.position.set(0.36, -0.1, 0.66);
+  agentRightBlush.position.set(0.35, -0.1, 0.64);
   agentHead.add(agentRightBlush);
 
   const earGeom = new THREE.ConeGeometry(0.18, 0.35, 4);
@@ -1527,44 +1518,48 @@ function initAgentPet() {
   agentRightEarCollider.position.set(0.45, 0.6, -0.1);
   agentHead.add(agentRightEarCollider);
 
-  agentBody = new THREE.Mesh(new THREE.SphereGeometry(0.58, 32, 32), porcelainMat);
+  agentBody = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), porcelainMat);
   agentBody.scale.set(1.0, 1.2, 1.0);
-  agentBody.position.y = -0.65;
+  agentBody.position.y = -0.62;
   agentRobotGroup.add(agentBody);
 
   agentBadge = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 16), agentBadgeMaterial);
-  agentBadge.position.set(0, 0.12, 0.615);
+  agentBadge.position.set(0, 0.12, 0.58);
   agentBody.add(agentBadge);
 
   const armGeom = new THREE.SphereGeometry(0.11, 16, 16);
   const leftArm = new THREE.Mesh(armGeom, porcelainMat);
-  leftArm.position.set(-0.68, -0.5, 0.15);
+  leftArm.position.set(-0.64, -0.5, 0.15);
   agentRobotGroup.add(leftArm);
 
   const rightArm = new THREE.Mesh(armGeom, porcelainMat);
-  rightArm.position.set(0.68, -0.5, 0.15);
+  rightArm.position.set(0.64, -0.5, 0.15);
   agentRobotGroup.add(rightArm);
 
-  const torusGeom = new THREE.TorusGeometry(0.9, 0.04, 8, 48);
+  const torusGeom = new THREE.TorusGeometry(0.85, 0.04, 8, 48);
   agentBaseRing = new THREE.Mesh(torusGeom, agentBaseRingMaterial);
   agentBaseRing.rotation.x = Math.PI / 2;
-  agentBaseRing.position.y = -1.35;
+  agentBaseRing.position.y = -1.3;
   agentRobotGroup.add(agentBaseRing);
 
   const nodeGeom = new THREE.BoxGeometry(0.12, 0.06, 0.12);
   for (let i = 0; i < 3; i++) {
     const angle = (i * Math.PI * 2) / 3;
     const node = new THREE.Mesh(nodeGeom, eyeGlowMat);
-    node.position.set(Math.cos(angle) * 0.9, Math.sin(angle) * 0.9, 0);
+    node.position.set(Math.cos(angle) * 0.85, Math.sin(angle) * 0.85, 0);
     agentBaseRing.add(node);
   }
 
-  const ambientLight = new THREE.AmbientLight(0x0e172e, 1.6);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
   agentThreeScene.add(ambientLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
-  dirLight.position.set(2, 5, 4);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  dirLight.position.set(3, 5, 4);
   agentThreeScene.add(dirLight);
+
+  const fillLight = new THREE.DirectionalLight(0xa5f3fc, 0.8);
+  fillLight.position.set(-3, -2, 3);
+  agentThreeScene.add(fillLight);
 
   const faceLight = new THREE.PointLight(0xffffff, 1.5, 4);
   faceLight.position.set(0, 0.5, 1.5);
