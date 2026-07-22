@@ -245,11 +245,6 @@ def init_db():
                 task_id TEXT DEFAULT '',
                 created_at TEXT NOT NULL
             );
-
-            CREATE INDEX IF NOT EXISTS idx_tasks_user_date ON tasks(username, date);
-            CREATE INDEX IF NOT EXISTS idx_tasks_user_subject ON tasks(username, subject);
-            CREATE INDEX IF NOT EXISTS idx_images_user_task ON images(username, task_id);
-            CREATE INDEX IF NOT EXISTS idx_agent_chat_user_session ON agent_chat_messages(username, session_id);
             """
         )
 
@@ -298,6 +293,15 @@ def init_db():
                     db.execute(f"ALTER TABLE tasks ADD COLUMN {column} {definition}")
                 except sqlite3.OperationalError:
                     pass
+
+        db.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tasks_user_date ON tasks(username, date);
+            CREATE INDEX IF NOT EXISTS idx_tasks_user_subject ON tasks(username, subject);
+            CREATE INDEX IF NOT EXISTS idx_images_user_task ON images(username, task_id);
+            CREATE INDEX IF NOT EXISTS idx_agent_chat_user_session ON agent_chat_messages(username, session_id);
+            """
+        )
 
         default_users = []
         student_user = os.environ.get("STUDENT_USER", "").strip()
