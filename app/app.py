@@ -260,17 +260,19 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
+        default_student = os.environ.get("EXTRA_STUDENT_USER", "").strip() or os.environ.get("STUDENT_USER", "student").strip()
+
         task_columns = {row["name"] for row in db.execute("PRAGMA table_info(tasks)")}
         if "username" not in task_columns:
             try:
-                db.execute("ALTER TABLE tasks ADD COLUMN username TEXT NOT NULL DEFAULT 'student'")
+                db.execute(f"ALTER TABLE tasks ADD COLUMN username TEXT NOT NULL DEFAULT '{default_student}'")
             except sqlite3.OperationalError:
                 pass
 
         pk_columns = [row["name"] for row in db.execute("PRAGMA table_info(tasks)").fetchall() if row["pk"] > 0]
         if pk_columns == ["id"]:
             old_cols = {row["name"] for row in db.execute("PRAGMA table_info(tasks)").fetchall()}
-            user_expr = "username" if "username" in old_cols else "'student'"
+            user_expr = "username" if "username" in old_cols else f"'{default_student}'"
             timer_target_expr = "timer_target_seconds" if "timer_target_seconds" in old_cols else "0"
             timer_elapsed_expr = "timer_elapsed_seconds" if "timer_elapsed_seconds" in old_cols else "0"
             timer_started_expr = "timer_started_at" if "timer_started_at" in old_cols else "NULL"
