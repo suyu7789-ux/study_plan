@@ -1462,9 +1462,12 @@ svg { flex: 0 0 auto; }
   background: radial-gradient(circle at 50% 50%, rgba(20, 30, 55, 0.4) 0%, rgba(5, 7, 15, 0.95) 100%);
   border: 2px solid rgba(45, 212, 191, 0.3);
   box-shadow: 0 0 25px rgba(45, 212, 191, 0.35);
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .desktop-pet-container:hover .pet-avatar-body {
@@ -1478,6 +1481,17 @@ svg { flex: 0 0 auto; }
   border-radius: 50%;
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.webgl-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  border-radius: 50% !important;
 }
 
 .pet-speech-bubble {
@@ -2001,9 +2015,9 @@ svg { flex: 0 0 auto; }
     bottom: 20px;
   }
   .desktop-pet-container.panel-open {
-    bottom: calc(88vh - 40px);
-    right: 16px;
-    transform: scale(0.8);
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.6);
   }
   .pet-avatar-body {
     width: 85px;
@@ -2019,12 +2033,21 @@ svg { flex: 0 0 auto; }
     height: 88vh;
     border-radius: 24px 24px 0 0;
     transform: translateY(100%);
+    background: rgba(11, 16, 28, 0.98);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    will-change: transform;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
   }
 
   .agent-panel.is-open {
     transform: translateY(0);
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .agent-drawer-backdrop {
+    will-change: opacity;
   }
 
   .drawer-handle-bar {

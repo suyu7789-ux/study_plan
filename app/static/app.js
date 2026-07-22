@@ -1323,7 +1323,7 @@ function initAgentPet() {
 
   agentThreeScene = new THREE.Scene();
   agentCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  agentCamera.position.set(0, 0, 5.0);
+  agentCamera.position.set(0, -0.05, 4.6);
 
   agentRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
   agentRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -1527,7 +1527,7 @@ function animateAgent3D() {
   const time = Date.now() * 0.0015;
 
   if (!agentIsJumping) {
-    currentY = Math.sin(time * 1.5) * 0.12;
+    currentY = 0.22 + Math.sin(time * 1.5) * 0.08;
     agentRobotGroup.position.y = currentY;
   } else {
     agentJumpTime += 0.05;
@@ -1717,8 +1717,10 @@ function openAgentDrawer() {
   if (pet) pet.classList.add("panel-open");
   if (backdrop) backdrop.classList.add("is-visible");
 
-  // 初始化获取历史
-  fetchAgentHistory("physics");
+  // 延迟 200ms 加载对话历史，确保移动端 slide-up CSS 动画 60fps 丝滑播放
+  setTimeout(() => {
+    fetchAgentHistory(currentSessionId || "physics");
+  }, 200);
 }
 
 function closeAgentDrawer() {
